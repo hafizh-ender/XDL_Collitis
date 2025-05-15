@@ -1,0 +1,12 @@
+DATASET:
+  DATA_PATH: "data/dataset"
+  TRAIN_DIR: "train"
+  VALID_DIR: "valid"
+  TEST_DIR: "test"
+  BATCH_SIZE: 32
+  IMAGE_SIZE: 299
+  IMAGE_CHANNELS: 3
+  CATEGORIES: ["1", "2", "3"]
+  NUM_WORKERS: 0
+  SHUFFLE: false
+  PIN_MEMORY: false
