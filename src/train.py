@@ -1,9 +1,16 @@
 import torch
 import tqdm
 
-def train(model, train_loader, val_loader, criterion, optimizer, num_epochs, device):
+def train(model, 
+          train_loader, 
+          val_loader, 
+          criterion, 
+          optimizer, 
+          num_epochs, 
+          device):
+    
     print("Training...")
-    loop = tqdm.notebook.trange(num_epochs)
+    loop = tqdm.trange(num_epochs)
     for epoch in loop:
         model.train()
         running_loss = 0.0
