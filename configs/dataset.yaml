@@ -1,8 +1,9 @@
 DATASET:
-  DATA_PATH: "data/dataset"
+  DATA_PATH: "datasets"
   TRAIN_DIR: "train"
   VALID_DIR: "valid"
   TEST_DIR: "test"
+  PROBLEM: "UC Only_LIMUC"
   BATCH_SIZE: 32
   IMAGE_SIZE: 299
   IMAGE_CHANNELS: 3

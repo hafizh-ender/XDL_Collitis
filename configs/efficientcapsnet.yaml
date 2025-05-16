@@ -2,16 +2,18 @@ CAPSNET:
   NAME: "efficientcapsnet"
   PROBLEM_TYPE: "LIMUC"
   ARTIFACT_DIR: "artifacts"
+  INPUT_SIZE: [3, 299, 299]
   CNN_HIDDEN_LAYERS: [32, 32, 64, 64, 64, 128, 128]
   CNN_KERNEL_STRIDE: [[5,] , [3,], [3,], [3,2], [3,2], [3,2], [3,2]]
   F: 128
   K: 3
   N: 128
-  D: 8*8
+  D: 64 #8*8
   S: 2
   DIGICAPS: 32
   NUM_CLASSES: 3
   NUM_EPOCHS: 250
+  NUM_WORKERS: 0
   BATCH_SIZE: 32
   LEARNING_RATE: 0.001
   WEIGHT_DECAY: 0.0001
