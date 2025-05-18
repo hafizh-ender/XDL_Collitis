@@ -101,7 +101,7 @@ class CapsMask(nn.Module):
 
 
 class EfficientCapsNet(nn.Module):
-    def __init__(self, input_size=(1, 28, 28)):
+    def __init__(self, input_size):
         super(EfficientCapsNet, self).__init__()
         self.conv1 = nn.Conv2d(
             in_channels=input_size[0], out_channels=32, kernel_size=5, padding=0
@@ -128,10 +128,17 @@ class EfficientCapsNet(nn.Module):
                 nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
 
     def forward(self, x):
+        print(x.shape)
         x = torch.relu(self.bn1(self.conv1(x)))
+        print(x.shape)
         x = torch.relu(self.bn2(self.conv2(x)))
+        print(x.shape)
         x = torch.relu(self.bn3(self.conv3(x)))
+        print(x.shape)
         x = torch.relu(self.bn4(self.conv4(x)))
+        print(x.shape)
         x = self.primary_caps(x)
+        print(x.shape)
         x = self.routing_caps(x)
+        print(x.shape)
         return x, self.len_final_caps(x)

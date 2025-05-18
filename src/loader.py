@@ -23,3 +23,6 @@ class Loader(torch.utils.data.DataLoader):
 
     def __iter__(self):
         return iter(self.dataloader)
+
+    def __len__(self):
+        return len(self.dataframe)

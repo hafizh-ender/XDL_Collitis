@@ -9,8 +9,17 @@ class MarginLoss(nn.Module):
         self.m_neg = m_neg
         self.lambda_ = lambda_
 
-    def forward(self, targets, digit_probs):
-        assert targets.shape is not digit_probs.shape
+    def forward(self, targets, model_output):
+        # Handle tuple output from model
+        if isinstance(model_output, tuple):
+            _, digit_probs = model_output
+        else:
+            digit_probs = model_output
+            
+        # Convert targets to one-hot encoding if needed
+        if len(targets.shape) == 1:
+            targets = torch.nn.functional.one_hot(targets, num_classes=digit_probs.shape[1])
+            
         present_losses = (
             targets * torch.clamp_min(self.m_pos - digit_probs, min=0.0) ** 2
         )

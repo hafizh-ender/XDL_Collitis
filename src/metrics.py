@@ -28,52 +28,44 @@ def mcc_score(y_true, y_pred):
 
     return numerator / (denominator + torch.finfo(torch.float32).eps)  # Avoid division by zero
 
-# class MatthewsCorrelationCoefficient(tf.keras.metrics.Metric):
-#     def __init__(self, num_classes, name='matthews_correlation_coefficient', **kwargs):
-#         super().__init__(name=name, **kwargs)
-#         self.num_classes = num_classes
-#         self.confusion_matrix = self.add_weight(
-#             name='conf_matrix',
-#             shape=(num_classes, num_classes),
-#             initializer='zeros',
-#             dtype=tf.float32
-#         )
+class MatthewsCorrelationCoefficient(torch.nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+        self.num_classes = num_classes
+        self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
 
-#     def update_state(self, y_true, y_pred, sample_weight=None):
-#         y_true_labels = tf.argmax(y_true, axis=1, output_type=tf.int32)
-#         y_pred_labels = tf.argmax(y_pred, axis=1, output_type=tf.int32)
+    def update(self, y_true, y_pred):
+        y_true_labels = torch.argmax(y_true, dim=1)
+        y_pred_labels = torch.argmax(y_pred, dim=1)
 
-#         cm = tf.math.confusion_matrix(
-#             y_true_labels,
-#             y_pred_labels,
-#             num_classes=self.num_classes,
-#             dtype=tf.float32
-#         )
+        cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
+        for t, p in zip(y_true_labels, y_pred_labels):
+            cm[t, p] += 1
 
-#         self.confusion_matrix.assign_add(cm)
+        self.confusion_matrix += cm
 
-#     def result(self):
-#         cm = self.confusion_matrix
+    def compute(self):
+        cm = self.confusion_matrix
 
-#         # Number of times a class truly occured
-#         t = tf.reduce_sum(cm, axis=1) # 1 x num_classes
+        # Number of times a class truly occurred
+        t = torch.sum(cm, dim=1)  # 1 x num_classes
 
-#         # Number of times a class is predicted
-#         p = tf.reduce_sum(cm, axis=0) # 1 x num_classes array
+        # Number of times a class is predicted
+        p = torch.sum(cm, dim=0)  # 1 x num_classes array
 
-#         # Total number of correctly predicted
-#         c = tf.reduce_sum(tf.linalg.diag_part(cm)) # 1 x num_classes array
+        # Total number of correctly predicted
+        c = torch.sum(torch.diag(cm))  # scalar
 
-#         # Total number of samples
-#         s = tf.reduce_sum(cm) # scalar
+        # Total number of samples
+        s = torch.sum(cm)  # scalar
 
-#         numerator = c * s - tf.tensordot(t, p, axes=1)
-#         denominator = tf.sqrt((s**2 - tf.tensordot(p, p, axes=1)) * (s**2 - tf.tensordot(t, t, axes=1)))
+        numerator = c * s - torch.dot(t, p)
+        denominator = torch.sqrt((s**2 - torch.dot(p, p)) * (s**2 - torch.dot(t, t)))
 
-#         return numerator / (denominator + tf.keras.backend.epsilon())
+        return numerator / (denominator + torch.finfo(torch.float32).eps)
 
-#     def reset_states(self):
-#         self.confusion_matrix.assign(tf.zeros_like(self.confusion_matrix))
+    def reset(self):
+        self.confusion_matrix.zero_()
 
 class CustomPrecision(torch.nn.Module):
     def __init__(self, num_classes, average="macro"):
