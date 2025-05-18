@@ -14,31 +14,8 @@ CAPSNET:
   NUM_CLASSES: 3
   NUM_EPOCHS: 10
   NUM_WORKERS: 0
-  BATCH_SIZE: 32
+  BATCH_SIZE: 1
   LEARNING_RATE: 0.001
   WEIGHT_DECAY: 0.0001
   MOMENTUM: 0.9
   DROPOUT_RATE: 0.5
-
-
-  # MODEL
-# # MODEL
-#     # CNN
-#     self.CNN_HIDDEN_LAYERS = [32, 32, 64, 64, 64, 128, 128]
-
-#     self.CNN_KERNEL_STRIDE = [[5,] , [3,], [3,], [3,2], [3,2], [3,2], [3,2]]
-
-#     # CAPSULES
-#     """
-#     F: int
-#         depthwise conv number of features
-#     K: int
-#         depthwise conv kernel dimension
-#     N: int
-#         number of primary capsules
-#     D: int
-#         primary capsules dimension (number of properties)
-#     s: int
-#         depthwise conv strides
-#     """
-#     (self.F, self.K,  self.N, self.D, self.S, self.DIGICAPS) =  (128, 3, 128, 8*8, 2, 32)
