@@ -1,7 +1,7 @@
 import torch
 from src.dataset import IterableDataset
 
-class Loader():
+class Loader(torch.utils.data.DataLoader):
     def __init__(self, dataframe, 
                  batch_size, 
                  num_workers, 

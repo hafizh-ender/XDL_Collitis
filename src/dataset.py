@@ -32,3 +32,19 @@ class IterableDataset(torch.utils.data.IterableDataset):
     
     def __getitem__(self, index):
         return self.dataframe.iloc[index]
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, dataframe: pd.DataFrame, transform=None):
+        self.dataframe = dataframe.reset_index(drop=True)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.dataframe)
+    
+    def __getitem__(self, index):
+        row = self.dataframe.iloc[index]
+        img = Image.open(row["image_path"]).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        label = row["class"]
+        return img, label
