@@ -1,13 +1,9 @@
-DATASET:
-  DATA_PATH: "datasets"
-  TRAIN_DIR: "train"
-  VALID_DIR: "valid"
-  TEST_DIR: "test"
-  PROBLEM: "UC Only_LIMUC"
-  BATCH_SIZE: 32
-  IMAGE_SIZE: 299
-  IMAGE_CHANNELS: 3
-  CATEGORIES: ["1", "2", "3"]
-  NUM_WORKERS: 0
-  SHUFFLE: false
-  PIN_MEMORY: false
+DATA_PATH: "datasets"
+TRAIN_DIR: "train"
+VALID_DIR: "valid"
+TEST_DIR: "test"
+PROBLEM: "UC Only_LIMUC"
+IMAGE_SIZE: 299
+IMAGE_CHANNELS: 3 #RGB
+CATEGORIES: ["1", "2", "3"]
+PIN_MEMORY: false

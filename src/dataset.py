@@ -1,8 +1,8 @@
 import math
 import pandas as pd
 import torch
+from torchvision.io import decode_image
 from PIL import Image
-import math
 
 class IterableDataset(torch.utils.data.IterableDataset):
     def __init__(self, dataframe: pd.DataFrame, transform=None):
@@ -21,7 +21,7 @@ class IterableDataset(torch.utils.data.IterableDataset):
 
         for idx in range(start, end):
             row = self.dataframe.iloc[idx]
-            img = Image.open(row["image_path"]).convert("RGB")
+            img = decode_image(row["image_path"], mode="RGB")
             if self.transform:
                 img = self.transform(img)
             label = row["class"]
@@ -43,7 +43,9 @@ class Dataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         row = self.dataframe.iloc[index]
+        # img = decode_image(row["image_path"], mode="RGB")
         img = Image.open(row["image_path"]).convert("RGB")
+        # print(img)
         if self.transform:
             img = self.transform(img)
         label = row["class"]

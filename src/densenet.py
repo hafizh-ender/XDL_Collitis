@@ -17,7 +17,6 @@ class DenseNet121(nn.Module):
         self.densenet_model = models.densenet121(weights='IMAGENET1K_V1')
         self.dropout = nn.Dropout(p=dropout_rate)
         self.classifier = nn.Linear(82944, num_classes)
-
         
     def forward(self, x):
         """

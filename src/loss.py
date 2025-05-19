@@ -28,21 +28,21 @@ class MarginLoss(nn.Module):
         self.m_neg = m_neg
         self.lambda_ = lambda_
 
-    def forward(self, targets, model_output):
+    def forward(self, target, input):
         # Handle tuple output from model
-        if isinstance(model_output, tuple):
-            _, digit_probs = model_output
+        if isinstance(input, tuple):
+            _, digit_probs = input
         else:
-            digit_probs = model_output
+            digit_probs = input
             
-        # Convert targets to one-hot encoding if needed
-        # if len(targets.shape) == 1:
-        #     targets = torch.nn.functional.one_hot(targets, num_classes=3)
+        # Convert target to one-hot encoding if needed
+        # if len(target.shape) == 1:
+        #     target = torch.nn.functional.one_hot(target, num_classes=3)
             
         present_losses = (
-            targets * torch.clamp_min(self.m_pos - digit_probs, min=0.0) ** 2
+            target * torch.clamp_min(self.m_pos - digit_probs, min=0.0) ** 2
         )
-        absent_losses = (1 - targets) * torch.clamp_min(
+        absent_losses = (1 - target) * torch.clamp_min(
             digit_probs - self.m_neg, min=0.0
         ) ** 2
         losses = present_losses + self.lambda_ * absent_losses
@@ -61,7 +61,7 @@ class TotalLoss(nn.Module):
         self.recon_loss = ReconstructionLoss()
         self.recon_factor = recon_factor
 
-    def forward(self, input_images, targets, reconstructions, digit_probs):
-        margin = self.margin_loss(targets, digit_probs)
+    def forward(self, input_images, target, reconstructions, digit_probs):
+        margin = self.margin_loss(target, digit_probs)
         recon = self.recon_loss(reconstructions, input_images)
         return margin + self.recon_factor * recon
