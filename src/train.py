@@ -7,7 +7,8 @@ from src.utils import (
     get_memory_usage,
     clear_memory,
     get_device,
-    is_best_model
+    is_best_model,
+    is_scheduler_per_batch
 )
 
 def train(model, 
@@ -88,6 +89,9 @@ def train(model,
                     else:
                         metric_obj.update(predicted_indices, targets)
 
+            if is_scheduler_per_batch(scheduler):
+                scheduler.step()
+
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -141,7 +145,7 @@ def train(model,
         val_metrics_str = ", ".join(val_metric_items_str)
         print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
-        if scheduler is not None:
+        if is_scheduler_per_batch(scheduler):
             scheduler.step()
 
         current_val_loss = history["val_loss"][-1]

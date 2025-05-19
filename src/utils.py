@@ -67,3 +67,14 @@ def is_best_model(current_metric, best_metric, mode="max", monitor_metric="loss"
         return current_metric > best_metric
     else:
         return current_metric < best_metric
+
+def is_scheduler_per_batch(scheduler):
+    if scheduler is None:
+        return False
+    if (isinstance(scheduler, torch.optim.lr_scheduler.CyclicLR)
+        or isinstance(scheduler, torch.optim.lr_scheduler.CosineAnnealingWarmRestarts)
+        or isinstance(scheduler, torch.optim.lr_scheduler.OneCycleLR)):
+        return True
+    else:
+        return False
+
