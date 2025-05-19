@@ -66,7 +66,7 @@ def train(model,
             if torch.isnan(model_outputs_raw).any() or torch.isinf(model_outputs_raw).any():
                 print("!!! NaN or Inf detected in model_outputs_raw !!!")
                 print(model_outputs_raw)
-
+                
             loss = criterion(input=model_outputs_raw, target=targets)
             
             if torch.isnan(loss).any() or torch.isinf(loss).any():
@@ -74,7 +74,7 @@ def train(model,
                 print(f"Loss value: {loss.item()}")
 
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
             
             running_loss += loss.item()

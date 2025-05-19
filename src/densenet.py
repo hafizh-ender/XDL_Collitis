@@ -12,7 +12,7 @@ class DenseNet121(nn.Module):
         """
         super(DenseNet121, self).__init__()
         
-        self.model = models.densenet121(pretrained=True)
+        self.model = models.densenet121(weights='IMAGENET1K_V1')
         
         num_features = self.model.classifier.in_features
         
