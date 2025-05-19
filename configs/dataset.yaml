@@ -4,7 +4,7 @@ DATASET:
   VALID_DIR: "valid"
   TEST_DIR: "test"
   PROBLEM: "UC Only_LIMUC"
-  BATCH_SIZE: 1
+  BATCH_SIZE: 4
   IMAGE_SIZE: 299
   IMAGE_CHANNELS: 3
   CATEGORIES: ["1", "2", "3"]
