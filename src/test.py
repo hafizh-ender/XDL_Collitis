@@ -13,21 +13,23 @@ def test(model, test_loader, device, criterion, print_every=10, metrics=None, te
             data = data.to(device)
             targets = torch.tensor([int(t) for t in targets], dtype=torch.long).to(device)
             
-            outputs = model(data)
-            loss = criterion(outputs, targets)
+            model_outputs_raw = model(data) # Shape: [batch_size, num_classes]
+            
+            loss = criterion(y_pred=model_outputs_raw, y_true=targets)
             
             test_loss += loss.item()
-            _, predicted = outputs.max(1)
+            
+            predicted_indices = model_outputs_raw.argmax(dim=1)
+            
             total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            correct += predicted_indices.eq(targets).sum().item()
 
             # metrics
             if metrics is not None:
                 for metric_name, metric in metrics.items():
-                    test_metrics[metric_name][batch_idx] = metric.update(outputs, targets)
+                    test_metrics[metric_name][batch_idx] = metric.update(predicted_indices, targets)
 
-            # Clear some memory after each batch
-            del outputs, loss, predicted
+            del model_outputs_raw, loss, predicted_indices # Adjusted variable names
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 

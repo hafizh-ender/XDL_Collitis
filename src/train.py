@@ -15,7 +15,8 @@ def train(model,
           val_loader, 
           criterion, 
           optimizer, 
-          num_epochs, 
+          scheduler = None,
+          num_epochs = 10, 
           device = get_device(),
           metrics = {},
           print_every = 10,
@@ -24,7 +25,6 @@ def train(model,
           save_model = True,
           save_metrics = True):
     
-    print(device)
     model.to(device)
     
     best_loss = float('inf')
@@ -37,14 +37,14 @@ def train(model,
     val_metrics_per_epoch = {key: np.zeros(num_epochs) for key in metrics.keys()}
     
     print("Training...")
-    print(f"Initial memory usage: {get_memory_usage()}")
+    # print(f"Initial memory usage: {get_memory_usage()}")
     loop = tqdm.trange(num_epochs)
     
     for epoch in loop:
         # Clear memory before each epoch
         clear_memory()
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
-        print(f"Memory before epoch: {get_memory_usage()}")
+        # print(f"Memory before epoch: {get_memory_usage()}")
         
         model.train()
         running_loss = 0.0
@@ -56,30 +56,33 @@ def train(model,
         # Training loop
         for batch_idx, (data, targets) in enumerate(train_loader):
             data = data.to(device)
+            print(f"data.shape: {data.shape}")
             targets = torch.tensor([int(t) for t in targets], dtype=torch.long).to(device)
             
             optimizer.zero_grad()
-            outputs = model(data)
-            print(f"outputs: {outputs}")
-            print(f"outputs[0].shape: {outputs[0].shape}")
+            
+            model_outputs_raw = model(data) # Shape: [batch_size, num_classes] still raw probabilities/logits per class
+            print(f"model_outputs_raw.shape: {model_outputs_raw.shape}")
+            print(f"targets.shape: {targets.shape}")
+            print(f"outputs: {model_outputs_raw}")
             print(f"targets: {targets}")
-
-            loss = criterion(outputs, targets)
+            loss = criterion(y_pred=model_outputs_raw, y_true=targets)
             loss.backward()
             optimizer.step()
             
             running_loss += loss.item()
-            _, predicted = outputs.max(1)
-            total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            
+            predicted_indices = model_outputs_raw.argmax(dim=1)
+            
+            total += targets.size(0) # targets are the original integer labels
+            correct += predicted_indices.eq(targets).sum().item()
 
             # metrics per batch
             if metrics is not None:
                 for metric_name, metric in metrics.items():
-                    train_metrics[metric_name][batch_idx] = metric.update(outputs, targets)
+                    train_metrics[metric_name][batch_idx] = metric.update(predicted_indices, targets)
 
-            # Clear some memory after each batch
-            del outputs, loss, predicted
+            del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
         
@@ -92,12 +95,15 @@ def train(model,
         val_loss.append(running_val_loss)
         val_acc.append(running_val_acc)
 
+        if scheduler is not None:
+            scheduler.step()
+
         # metrics per epoch
         for metric_name, metric in metrics.items():
             train_metrics_per_epoch[metric_name][epoch] = train_metrics[metric_name].mean()
             val_metrics_per_epoch[metric_name][epoch] = val_metrics[metric_name].mean()
 
-        print(f"Memory after epoch: {get_memory_usage()}")
+        # print(f"Memory after epoch: {get_memory_usage()}")
         loop.set_postfix(
             train_loss=train_loss[-1], 
             train_acc=train_acc[-1], 
