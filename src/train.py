@@ -82,8 +82,11 @@ def train(model,
             predicted_indices = model_outputs_raw.argmax(dim=1)
             
             if metrics:
-                for metric_obj in metrics.values():
-                    metric_obj.update(predicted_indices, targets)
+                for metric_name, metric_obj in metrics.items():
+                    if metric_name in ["auroc", "auprc"]:
+                        metric_obj.update(model_outputs_raw, targets)
+                    else:
+                        metric_obj.update(predicted_indices, targets)
 
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
@@ -139,7 +142,7 @@ def train(model,
         print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
         if scheduler is not None:
-            scheduler.step(val_loss_epoch)
+            scheduler.step()
 
         current_val_loss = history["val_loss"][-1]
         if save_model and is_best_model(current_val_loss, best_loss, mode="min"):

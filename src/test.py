@@ -24,8 +24,11 @@ def test(model, test_loader, device, criterion, print_every=10, metrics=None):
             
             # Update all metrics
             if metrics:
-                for metric_obj in metrics.values(): # Renamed to metric_obj for clarity
-                    metric_obj.update(predicted_indices, targets)
+                for metric_name, metric_obj in metrics.items(): # Renamed to metric_obj for clarity
+                    if metric_name in ["auroc", "auprc"]:
+                        metric_obj.update(model_outputs_raw, targets)
+                    else:
+                        metric_obj.update(predicted_indices, targets)
 
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
