@@ -1,23 +1,23 @@
 import torch
 import torch.nn as nn
 
-def marginLoss(y_true, y_pred):
-    # y_true: integer tensor of shape [batch_size] (true class labels)
-    # y_pred: float tensor of shape [batch_size, num_classes] (model's raw output/scores)
+def marginLoss(input, target):
+    # target: integer tensor of shape [batch_size] (true class labels)
+    # input: float tensor of shape [batch_size, num_classes] (model's raw output/scores)
     lbd = 0.5
     m_plus = 0.9
     m_minus = 0.1
 
-    # Determine number of classes from y_pred
-    num_classes = y_pred.shape[1]
+    # Determine number of classes from input
+    num_classes = input.shape[1]
 
-    # Convert y_true (integer labels) to one-hot encoding
-    y_true_one_hot = torch.nn.functional.one_hot(y_true, num_classes=num_classes).float()
-    # Ensure y_true_one_hot is on the same device as y_pred
-    y_true_one_hot = y_true_one_hot.to(y_pred.device)
+    # Convert target (integer labels) to one-hot encoding
+    target_one_hot = torch.nn.functional.one_hot(target, num_classes=num_classes).float()
+    # Ensure target_one_hot is on the same device as input
+    target_one_hot = target_one_hot.to(input.device)
 
-    L = y_true_one_hot * torch.clamp(m_plus - y_pred, min=0.0).pow(2) + \
-        lbd * (1 - y_true_one_hot) * torch.clamp(y_pred - m_minus, min=0.0).pow(2)
+    L = target_one_hot * torch.clamp(m_plus - input, min=0.0).pow(2) + \
+        lbd * (1 - target_one_hot) * torch.clamp(input - m_minus, min=0.0).pow(2)
 
     return torch.mean(torch.sum(L, dim=1)) # Sum over classes, then mean over batch
 

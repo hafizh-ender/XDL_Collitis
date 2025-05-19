@@ -1,40 +1,47 @@
 import torch
 from src.utils import clear_memory, get_memory_usage
 
-def test(model, test_loader, device, criterion, print_every=10, metrics=None, test_metrics={}):
+def test(model, test_loader, device, criterion, print_every=10, metrics=None):
     model.eval()
     test_loss = 0.0
-    correct = 0
-    total = 0
+    # Manual accuracy calculation (correct, total) is removed as it should come from metrics if desired.
     
+    if metrics:
+        for metric in metrics.values():
+            metric.to(device)
+            metric.reset()
+
     with torch.no_grad():
         for batch_idx, (data, targets) in enumerate(test_loader):
-            
             data = data.to(device)
-            targets = torch.tensor([int(t) for t in targets], dtype=torch.long).to(device)
+            targets = torch.tensor([int(t) - 1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
             
-            model_outputs_raw = model(data) # Shape: [batch_size, num_classes]
-            
-            loss = criterion(y_pred=model_outputs_raw, y_true=targets)
-            
+            model_outputs_raw = model(data)
+            loss = criterion(y_pred=model_outputs_raw, y_true=targets) # Assuming criterion still uses y_pred, y_true
             test_loss += loss.item()
             
             predicted_indices = model_outputs_raw.argmax(dim=1)
             
-            total += targets.size(0)
-            correct += predicted_indices.eq(targets).sum().item()
+            # Update all metrics
+            if metrics:
+                for metric_obj in metrics.values(): # Renamed to metric_obj for clarity
+                    metric_obj.update(predicted_indices, targets)
 
-            # metrics
-            if metrics is not None:
-                for metric_name, metric in metrics.items():
-                    test_metrics[metric_name][batch_idx] = metric.update(predicted_indices, targets)
-
-            del model_outputs_raw, loss, predicted_indices # Adjusted variable names
+            del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-    test_loss = test_loss / len(test_loader)
-    test_acc = 100. * correct / total
+    test_loss_avg = test_loss / len(test_loader)
     
-    return test_loss, test_acc, test_metrics
+    computed_metrics = {}
+    if metrics:
+        for metric_name, metric_obj in metrics.items(): # Renamed to metric_obj
+            val = metric_obj.compute().clone().detach().cpu()
+            computed_metrics[metric_name] = val.item() if val.numel() == 1 else val.numpy()
+            metric_obj.reset()
+            
+    clear_memory()
+    
+    # Accuracy, if calculated, will be in computed_metrics under its key (e.g., "accuracy")
+    return test_loss_avg, computed_metrics
 

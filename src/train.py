@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+import json
 from src.test import test
 from src.utils import (
     get_memory_usage,
@@ -25,132 +26,167 @@ def train(model,
           save_metrics = True):
     
     model.to(device)
+    if metrics:
+        for metric_obj in metrics.values():
+            metric_obj.to(device)
     
     best_loss = float('inf')
     best_epoch = 0
-    train_loss = []
-    train_acc = []
-    val_loss = []
-    val_acc = []
-    train_metrics_per_epoch = {key: np.zeros(num_epochs) for key in metrics.keys()}
-    val_metrics_per_epoch = {key: np.zeros(num_epochs) for key in metrics.keys()}
+    history = {
+        "train_loss": [],
+        "val_loss": [],
+        "train_metrics": {key: [] for key in metrics.keys()},
+        "val_metrics": {key: [] for key in metrics.keys()}
+    }
     
     print("Training...")
-    # print(f"Initial memory usage: {get_memory_usage()}")
     
     for epoch in range(num_epochs):
-        # Clear memory before each epoch
         clear_memory()
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
-        # print(f"Memory before epoch: {get_memory_usage()}")
         
         model.train()
         running_loss = 0.0
-        correct = 0
-        total = 0
-        train_metrics = {key: np.zeros(len(train_loader)) for key in metrics.keys()}
-        val_metrics = {key: np.zeros(len(val_loader)) for key in metrics.keys()}
         
-        # Training loop
+        if metrics:
+            for metric_obj in metrics.values():
+                metric_obj.reset()
+
         for batch_idx, (data, targets) in enumerate(train_loader):
             data = data.to(device)
-            print(f"data.shape: {data.shape}")
-            targets = torch.tensor([int(t)-1 for t in targets], dtype=torch.long).to(device)
+            targets = torch.tensor([int(t)-1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
 
-            # Check for NaNs/Infs in input data
             if torch.isnan(data).any() or torch.isinf(data).any():
                 print("!!! NaN or Inf detected in input data !!!")
-                # consider raising an error or breaking
             
             optimizer.zero_grad()
             
-            model_outputs_raw = model(data) # Shape: [batch_size, num_classes] still raw probabilities/logits per class
+            model_outputs_raw = model(data)
             
-            # Check for NaNs/Infs in model output
             if torch.isnan(model_outputs_raw).any() or torch.isinf(model_outputs_raw).any():
                 print("!!! NaN or Inf detected in model_outputs_raw !!!")
                 print(model_outputs_raw)
-                # consider raising an error or breaking
 
-            print(f"model_outputs_raw.shape: {model_outputs_raw.shape}")
-            print(f"outputs: {model_outputs_raw}")
-            print(f"targets: {targets}")
-            loss = criterion(y_pred=model_outputs_raw, y_true=targets)
+            loss = criterion(input=model_outputs_raw, target=targets)
             
-            # Check for NaNs/Infs in loss
             if torch.isnan(loss).any() or torch.isinf(loss).any():
                 print("!!! NaN or Inf detected in loss !!!")
                 print(f"Loss value: {loss.item()}")
-                # consider raising an error or breaking
 
             loss.backward()
-            
-            # Gradient Clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-            
             optimizer.step()
             
             running_loss += loss.item()
             
             predicted_indices = model_outputs_raw.argmax(dim=1)
-            total += targets.size(0) # targets are the original integer labels
-            correct += predicted_indices.eq(targets).sum().item()
-
-            # metrics per batch
-            if metrics is not None:
-                for metric_name, metric in metrics.items():
-                    train_metrics[metric_name][batch_idx] = metric.update(predicted_indices, targets)
+            
+            if metrics:
+                for metric_obj in metrics.values():
+                    metric_obj.update(predicted_indices, targets)
 
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-            if batch_idx % print_every == 0:
-                print(f"Batch {batch_idx + 1}/{len(train_loader)}")
-                print(f"Running loss: {running_loss / (batch_idx + 1)}")
-                print(f"Metrics: {train_metrics}")
+            if (batch_idx + 1) % print_every == 0:
+                print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")
         
-        train_loss.append(running_loss / len(train_loader))
-        train_acc.append(100. * correct / total)
+        history["train_loss"].append(running_loss / len(train_loader))
         
-        # Validation phase
-        model.eval()
-        running_val_loss, running_val_acc, val_metrics = test(model, val_loader, device, criterion, metrics, print_every)
-        val_loss.append(running_val_loss)
-        val_acc.append(running_val_acc)
+        epoch_train_metrics_computed = {}
+        if metrics:
+            for metric_name, metric_obj in metrics.items():
+                val = metric_obj.compute().clone().detach().cpu()
+                metric_val_to_store = val.item() if val.numel() == 1 else val.numpy()
+                history["train_metrics"][metric_name].append(metric_val_to_store)
+                epoch_train_metrics_computed[metric_name] = metric_val_to_store
+        
+        # Construct print string for train metrics, including accuracy if present
+        train_metric_items_str = []
+        for name, val in epoch_train_metrics_computed.items():
+            if isinstance(val, float):
+                train_metric_items_str.append(f"{name}: {val:.4f}")
+            elif isinstance(val, np.ndarray):
+                 # Format numpy array elements, perhaps join them or take a mean/specific element
+                formatted_array = np.array2string(val, formatter={'float_kind':lambda x: "%.4f" % x})
+                train_metric_items_str.append(f"{name}: {formatted_array}")
+            else:
+                train_metric_items_str.append(f"{name}: {val}")
+        train_metrics_str = ", ".join(train_metric_items_str)
+        print(f"Epoch {epoch+1} Train - Loss: {history['train_loss'][-1]:.4f}, Metrics: {{{train_metrics_str}}}")
+
+        val_loss_epoch, val_metrics_computed = test(model, val_loader, device, criterion, print_every, metrics)
+        history["val_loss"].append(val_loss_epoch)
+        
+        if metrics:
+            for metric_name, value in val_metrics_computed.items():
+                if metric_name in history["val_metrics"]:
+                    history["val_metrics"][metric_name].append(value)
+                else:
+                    print(f"Warning: Metric '{metric_name}' from validation not in history init. Value: {value}")
+        
+        val_metric_items_str = []
+        for name, val in val_metrics_computed.items():
+            if isinstance(val, float):
+                val_metric_items_str.append(f"{name}: {val:.4f}")
+            elif isinstance(val, np.ndarray):
+                formatted_array = np.array2string(val, formatter={'float_kind':lambda x: "%.4f" % x})
+                val_metric_items_str.append(f"{name}: {formatted_array}")
+            else:
+                val_metric_items_str.append(f"{name}: {val}")
+        val_metrics_str = ", ".join(val_metric_items_str)
+        print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
         if scheduler is not None:
-            scheduler.step()
+            scheduler.step(val_loss_epoch)
 
-        # metrics per epoch
-        for metric_name, metric in metrics.items():
-            train_metrics_per_epoch[metric_name][epoch] = train_metrics[metric_name].mean()
-            val_metrics_per_epoch[metric_name][epoch] = val_metrics[metric_name].mean()
-
-        # save model
-        if not save_model and epoch + 1 < save_patience:
-            continue
-        if is_best_model(val_loss[-1], best_loss, mode="min"):
-            # delete the previous best model
-            if os.path.exists(save_path + f"/epoch_{best_epoch+1}.pth"):
-                os.remove(save_path + f"/epoch_{best_epoch+1}.pth")
+        current_val_loss = history["val_loss"][-1]
+        if save_model and is_best_model(current_val_loss, best_loss, mode="min"):
+            if best_epoch > 0 and os.path.exists(os.path.join(save_path, f"epoch_{best_epoch+1}.pth")):
+                 try:
+                    os.remove(os.path.join(save_path, f"epoch_{best_epoch+1}.pth"))
+                 except OSError as e:
+                    print(f"Error deleting old model: {e}")
             
-            # save new best model
-            best_loss = val_loss[-1]
+            best_loss = current_val_loss
             best_epoch = epoch
-            torch.save(model.state_dict(), save_path + f"/epoch_{best_epoch+1}.pth")
-            print(f"Model saved to {save_path}")
+            if not os.path.exists(save_path):
+                os.makedirs(save_path)
+            torch.save(model.state_dict(), os.path.join(save_path, f"epoch_{best_epoch+1}.pth"))
+            print(f"Model saved to {os.path.join(save_path, f'epoch_{best_epoch+1}.pth')}")
+        elif epoch > best_epoch and epoch + 1 - best_epoch >= save_patience:
+            print(f"Early stopping triggered after {save_patience} epochs with no improvement since epoch {best_epoch + 1}.")
+            break
 
-        # Clear memory after each epoch
         clear_memory()
     
-    # save metrics
     if save_metrics:
-        import json
-        with open(save_path + "/metrics.json", "w") as f:
-            json.dump(metrics, f)
+        final_history_to_save = {
+            "train_loss": history.get("train_loss", []),
+            "val_loss": history.get("val_loss", []),
+            "train_metrics": {},
+            "val_metrics": {}
+        }
+        if "train_metrics" in history:
+            for metric_name, values_list in history["train_metrics"].items():
+                final_history_to_save["train_metrics"][metric_name] = [
+                    v.tolist() if isinstance(v, np.ndarray) else v for v in values_list
+                ]
+        if "val_metrics" in history:
+             for metric_name, values_list in history["val_metrics"].items():
+                final_history_to_save["val_metrics"][metric_name] = [
+                    v.tolist() if isinstance(v, np.ndarray) else v for v in values_list
+                ]
+        
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        save_file_path = os.path.join(save_path, "training_history.json")
+        with open(save_file_path, "w") as f:
+            json.dump(final_history_to_save, f, indent=4)
+        print(f"Training history saved to {save_file_path}")
 
-    return train_loss, train_acc, val_loss, val_acc, train_metrics_per_epoch, val_metrics_per_epoch
+    return history
 
 
 

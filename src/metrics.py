@@ -1,206 +1,78 @@
 import torch
+from torcheval.metrics.metric import Metric
+from typing import Iterable, TYPE_CHECKING, TypeVar, cast
 
-def mcc_score(y_true, y_pred):
-    """
-    Matthew Correlation Coefficient (MCC) for multiclass
-    """
-    # Get predicted class indices
-    y_true_label = torch.argmax(y_true, dim=1)
-    y_pred_label = torch.argmax(y_pred, dim=1)
+if TYPE_CHECKING:
+    from typing_extensions import Self # Or from typing import Self for Python 3.11+
 
-    # Get number of classes
-    num_classes = y_pred.size(1)
+_T = TypeVar("_T", bound="Metric") # TypeVar for merge_state
 
-    # Compute confusion matrix
-    cm = torch.zeros((num_classes, num_classes), dtype=torch.float32, device=y_pred.device)
-    for t, p in zip(y_true_label, y_pred_label):
-        cm[t.item(), p.item()] += 1
-
-    # Compute necessary sums
-    t = torch.sum(cm, dim=1)  # True counts per class
-    p = torch.sum(cm, dim=0)  # Predicted counts per class
-    c = torch.diag(cm)  # Correctly predicted per class
-    s = torch.sum(cm)  # Total samples
-
-    # Compute MCC numerator and denominator
-    numerator = torch.sum(c) * s - torch.dot(t, p)
-    denominator = torch.sqrt((s ** 2 - torch.dot(p, p)) * (s ** 2 - torch.dot(t, t)))
-
-    return numerator / (denominator + torch.finfo(torch.float32).eps)  # Avoid division by zero
-
-class MatthewsCorrelationCoefficient(torch.nn.Module):
-    def __init__(self, num_classes):
-        super().__init__()
+class MulticlassMCC(Metric):
+    def __init__(self, num_classes, device: torch.device | str | None = None):
+        resolved_device = device if isinstance(device, torch.device) else torch.device(device or 'cpu')
+        super().__init__(device=resolved_device)
         self.num_classes = num_classes
-        self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
+        self._add_state("confusion_matrix", torch.zeros(num_classes, num_classes, device=resolved_device))
 
-    def update(self, y_true, y_pred):
+    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor) -> "Self":
         y_true_labels = y_true
         y_pred_labels = y_pred
         
-        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
+        if self.confusion_matrix.device != y_true.device:
+            self.confusion_matrix = self.confusion_matrix.to(y_true.device)
         
-        cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
         for t, p in zip(y_true_labels, y_pred_labels):
-            cm[t, p] += 1
+            self.confusion_matrix[t.long(), p.long()] += 1
 
-        self.confusion_matrix += cm
+        return self
 
-    def compute(self):
+    def compute(self) -> torch.Tensor:
         cm = self.confusion_matrix
-
-        # Number of times a class truly occurred
-        t = torch.sum(cm, dim=1)  # 1 x num_classes
-
-        # Number of times a class is predicted
-        p = torch.sum(cm, dim=0)  # 1 x num_classes array
-
-        # Total number of correctly predicted
-        c = torch.sum(torch.diag(cm))  # scalar
-
-        # Total number of samples
-        s = torch.sum(cm)  # scalar
-
+        t = torch.sum(cm, dim=1)
+        p = torch.sum(cm, dim=0)
+        c = torch.sum(torch.diag(cm))
+        s = torch.sum(cm)
         numerator = c * s - torch.dot(t, p)
         denominator = torch.sqrt((s**2 - torch.dot(p, p)) * (s**2 - torch.dot(t, t)))
-
         return numerator / (denominator + torch.finfo(torch.float32).eps)
 
-    def reset(self):
+    def reset(self) -> "Self":
         self.confusion_matrix.zero_()
+        return self
 
-class CustomPrecision(torch.nn.Module):
-    def __init__(self, num_classes, average="macro"):
-        super().__init__()
+    def merge_state(self: _T, metrics: Iterable[_T]) -> _T:
+        for metric_obj in metrics:
+            if not isinstance(metric_obj, MulticlassMCC):
+                raise TypeError(f"Cannot merge_state for MulticlassMCC with metric of type {type(metric_obj).__name__}")
+            typed_metric = cast(MulticlassMCC, metric_obj)
+            
+            other_cm_state = typed_metric.confusion_matrix
+            if self.confusion_matrix.device != other_cm_state.device:
+                other_cm_state = other_cm_state.to(self.confusion_matrix.device)
+            self.confusion_matrix += other_cm_state
+        return self
+
+class MulticlassSpecificity(Metric):
+    def __init__(self, num_classes, device: torch.device | str | None = None, average="macro"):
+        resolved_device = device if isinstance(device, torch.device) else torch.device(device or 'cpu')
+        super().__init__(device=resolved_device)
         self.num_classes = num_classes
         self.average = average
-        self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
+        self._add_state("confusion_matrix", torch.zeros(num_classes, num_classes, device=resolved_device))
 
-    def update(self, y_true, y_pred):
-        y_true_labels = y_true
-        y_pred_labels = y_pred
-        cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
-        for t, p in zip(y_true_labels, y_pred_labels):
-            cm[t, p] += 1
-        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
-        self.confusion_matrix += cm
-
-    def compute(self):
-        cm = self.confusion_matrix
-        tp = torch.diag(cm)
-        predicted_positives = torch.sum(cm, dim=0)
-        actual_positives = torch.sum(cm, dim=1)
-        precision_per_class = tp / (predicted_positives + torch.finfo(torch.float32).eps)
-
-        if self.average == "macro":
-            return torch.mean(precision_per_class)
-        elif self.average == "micro":
-            total_tp = torch.sum(tp)
-            total_predicted_positives = torch.sum(predicted_positives)
-            return total_tp / (total_predicted_positives + torch.finfo(torch.float32).eps)
-        elif self.average == "weighted":
-            weights = actual_positives / (torch.sum(actual_positives) + torch.finfo(torch.float32).eps)
-            return torch.sum(precision_per_class * weights)
-        elif self.average == "none":
-            return precision_per_class
-        else:
-            raise ValueError(f"Unknown average type: {self.average}")
-
-    def reset(self):
-        self.confusion_matrix.zero_()
-
-class CustomRecall(torch.nn.Module):
-    def __init__(self, num_classes, average="macro"):
-        super().__init__()
-        self.num_classes = num_classes
-        self.average = average
-        self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
-
-    def update(self, y_true, y_pred):
+    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor) -> "Self":
         y_true_labels = y_true
         y_pred_labels = y_pred
 
-        cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
+        if self.confusion_matrix.device != y_true.device:
+            self.confusion_matrix = self.confusion_matrix.to(y_true.device)
+            
         for t, p in zip(y_true_labels, y_pred_labels):
-            cm[t, p] += 1
-        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
-        self.confusion_matrix += cm
+            self.confusion_matrix[t.long(), p.long()] += 1
+        
+        return self
 
-    def compute(self):
-        cm = self.confusion_matrix
-        tp = torch.diag(cm)
-        actual_positives = torch.sum(cm, dim=1)
-        recall_per_class = tp / (actual_positives + torch.finfo(torch.float32).eps)
-
-        if self.average == "macro":
-            return torch.mean(recall_per_class)
-        elif self.average == "micro":
-            total_tp = torch.sum(tp)
-            total_actual_positives = torch.sum(actual_positives)
-            return total_tp / (total_actual_positives + torch.finfo(torch.float32).eps)
-        elif self.average == "weighted":
-            weights = actual_positives / (torch.sum(actual_positives) + torch.finfo(torch.float32).eps)
-            return torch.sum(recall_per_class * weights)
-        elif self.average == "none":
-            return recall_per_class
-        else:
-            raise ValueError(f"Unknown average type: {self.average}")
-
-    def reset(self):
-        self.confusion_matrix.zero_()
-
-class CustomAUC(torch.nn.Module):
-    def __init__(self, num_classes, average="macro"):
-        super().__init__()
-        self.num_classes = num_classes
-        self.average = average
-        self.register_buffer('all_targets', torch.tensor([]))
-        self.register_buffer('all_preds', torch.tensor([]))
-
-    def update(self, y_true, y_pred):
-        self.all_targets = torch.cat([self.all_targets, y_true.detach().cpu()])
-        self.all_preds = torch.cat([self.all_preds, y_pred.detach().cpu()])
-
-    def compute(self):
-        aucs = []
-        for i in range(self.num_classes):
-            try:
-                from sklearn.metrics import roc_auc_score
-                auc = roc_auc_score(self.all_targets[:, i].numpy(), self.all_preds[:, i].numpy())
-                aucs.append(auc)
-            except:
-                aucs.append(0.0)
-        aucs = torch.tensor(aucs)
-
-        if self.average == "macro":
-            return torch.mean(aucs)
-        elif self.average == "none":
-            return aucs
-        else:
-            raise ValueError(f"Averaging method {self.average} is not supported for AUC (use 'macro' or 'none').")
-
-    def reset(self):
-        self.all_targets = torch.tensor([])
-        self.all_preds = torch.tensor([])
-
-class CustomSpecificity(torch.nn.Module):
-    def __init__(self, num_classes, average="macro"):
-        super().__init__()
-        self.num_classes = num_classes
-        self.average = average
-        self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
-
-    def update(self, y_true, y_pred):
-        y_true_labels = y_true
-        y_pred_labels = y_pred
-
-        cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
-        for t, p in zip(y_true_labels, y_pred_labels):
-            cm[t, p] += 1
-        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
-        self.confusion_matrix += cm
-
-    def compute(self):
+    def compute(self) -> torch.Tensor:
         cm = self.confusion_matrix
         tp = torch.diag(cm)
         fp = torch.sum(cm, dim=0) - tp
@@ -216,13 +88,26 @@ class CustomSpecificity(torch.nn.Module):
             total_fp = torch.sum(fp)
             return total_tn / (total_tn + total_fp + torch.finfo(torch.float32).eps)
         elif self.average == "weighted":
-            actual_negatives = torch.sum(cm, dim=1)
-            weights = actual_negatives / (torch.sum(actual_negatives) + torch.finfo(torch.float32).eps)
+            support = torch.sum(cm, dim=0) - torch.diag(cm) + (torch.sum(cm) - torch.sum(cm, dim=1))
+            weights = support / (torch.sum(support) + torch.finfo(torch.float32).eps)
             return torch.sum(specificity_per_class * weights)
         elif self.average == "none":
             return specificity_per_class
         else:
             raise ValueError(f"Unknown average type: {self.average}")
 
-    def reset(self):
+    def reset(self) -> "Self":
         self.confusion_matrix.zero_()
+        return self
+
+    def merge_state(self: _T, metrics: Iterable[_T]) -> _T:
+        for metric_obj in metrics:
+            if not isinstance(metric_obj, MulticlassSpecificity):
+                raise TypeError(f"Cannot merge_state for MulticlassSpecificity with metric of type {type(metric_obj).__name__}")
+            typed_metric = cast(MulticlassSpecificity, metric_obj)
+            
+            other_cm_state = typed_metric.confusion_matrix
+            if self.confusion_matrix.device != other_cm_state.device:
+                other_cm_state = other_cm_state.to(self.confusion_matrix.device)
+            self.confusion_matrix += other_cm_state
+        return self
