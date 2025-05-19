@@ -40,11 +40,8 @@ class PrimaryCaps(nn.Module):
         self.squash = Squash()
 
     def forward(self, x):
-        print(f"input shape to primary caps: {x.shape}")
         batch_size = x.size(0)
-        print(f"batch_size: {batch_size}")
         x = self.dw_conv2d(x)
-        print(f"x.shape after dw_conv2d: {x.shape}")
         
         # Calculate spatial dimensions
         spatial_size = x.size(2) * x.size(3)
@@ -152,19 +149,55 @@ class EfficientCapsNet(nn.Module):
                 nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
 
     def forward(self, x, y_true=None, mode="train"):
-        # print(f"x.shape before conv1: {x.shape}")
-        x = torch.relu(self.bn1(self.conv1(x)))
-        # print(f"x.shape after conv1: {x.shape}")
+        def print_stats(tensor, name, is_param=False):
+            if tensor is None:
+                print(f"{name} is None")
+                return
+            if torch.isnan(tensor).any() or torch.isinf(tensor).any():
+                print(f"!!! NaN or Inf detected in {name} !!!")
+                print(tensor)
+            else:
+                print(f"{name} - min: {tensor.min().item():.4f}, max: {tensor.max().item():.4f}, mean: {tensor.mean().item():.4f}, shape: {tensor.shape}")
+
+        print_stats(x, "Initial input x")
+
+        # --- Detailed check for conv1 and bn1 ---
+        print("--- Checking conv1 and bn1 parameters ---")
+        print_stats(self.conv1.weight, "conv1.weight", is_param=True)
+        if self.conv1.bias is not None:
+            print_stats(self.conv1.bias, "conv1.bias", is_param=True)
+        print_stats(self.bn1.weight, "bn1.weight", is_param=True)
+        print_stats(self.bn1.bias, "bn1.bias", is_param=True)
+        if self.bn1.running_mean is not None:
+             print_stats(self.bn1.running_mean, "bn1.running_mean", is_param=True)
+        if self.bn1.running_var is not None:
+             print_stats(self.bn1.running_var, "bn1.running_var", is_param=True)
+        print("--- End of conv1 and bn1 parameters ---")
+
+        out_conv1 = self.conv1(x)
+        print_stats(out_conv1, "x after conv1")
+        
+        out_bn1 = self.bn1(out_conv1)
+        print_stats(out_bn1, "x after bn1 (before relu)")
+        
+        x = torch.relu(out_bn1)
+        print_stats(x, "x after conv1 + bn1 + relu")
+        # --- End of detailed check ---
+        
         x = torch.relu(self.bn2(self.conv2(x)))
-        # print(f"x.shape after conv2: {x.shape}")
+        print_stats(x, "x after conv2 + bn2 + relu")
         x = torch.relu(self.bn3(self.conv3(x)))
-        # print(f"x.shape after conv3: {x.shape}")
+        print_stats(x, "x after conv3 + bn3 + relu")
         x = torch.relu(self.bn4(self.conv4(x)))
-        # print(f"x.shape after conv4: {x.shape}")
+        print_stats(x, "x after conv4 + bn4 + relu (input to primary_caps)")
+        
         x = self.primary_caps(x)
-        # print(f"x.shape after primary_caps: {x.shape}")
+        print_stats(x, "x after primary_caps")
+        
         x = self.routing_caps(x)
-        # print(f"x.shape after routing_caps: {x.shape}")
+        print_stats(x, "x after routing_caps (input to len_final_caps)")
+        
         y_predict = self.len_final_caps(x)
-        # print(f"y_predict.shape: {y_predict.shape}")
+        print_stats(y_predict, "y_predict (final model output)")
+        
         return y_predict

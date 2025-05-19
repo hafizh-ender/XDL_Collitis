@@ -1,5 +1,4 @@
 import torch
-import tqdm
 import numpy as np
 import os
 from src.test import test
@@ -19,7 +18,7 @@ def train(model,
           num_epochs = 10, 
           device = get_device(),
           metrics = {},
-          print_every = 10,
+          print_every = 1,
           save_patience = 10,
           save_path = "",
           save_model = True,
@@ -38,9 +37,8 @@ def train(model,
     
     print("Training...")
     # print(f"Initial memory usage: {get_memory_usage()}")
-    loop = tqdm.trange(num_epochs)
     
-    for epoch in loop:
+    for epoch in range(num_epochs):
         # Clear memory before each epoch
         clear_memory()
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
@@ -57,23 +55,44 @@ def train(model,
         for batch_idx, (data, targets) in enumerate(train_loader):
             data = data.to(device)
             print(f"data.shape: {data.shape}")
-            targets = torch.tensor([int(t) for t in targets], dtype=torch.long).to(device)
+            targets = torch.tensor([int(t)-1 for t in targets], dtype=torch.long).to(device)
+
+            # Check for NaNs/Infs in input data
+            if torch.isnan(data).any() or torch.isinf(data).any():
+                print("!!! NaN or Inf detected in input data !!!")
+                # consider raising an error or breaking
             
             optimizer.zero_grad()
             
             model_outputs_raw = model(data) # Shape: [batch_size, num_classes] still raw probabilities/logits per class
+            
+            # Check for NaNs/Infs in model output
+            if torch.isnan(model_outputs_raw).any() or torch.isinf(model_outputs_raw).any():
+                print("!!! NaN or Inf detected in model_outputs_raw !!!")
+                print(model_outputs_raw)
+                # consider raising an error or breaking
+
             print(f"model_outputs_raw.shape: {model_outputs_raw.shape}")
-            print(f"targets.shape: {targets.shape}")
             print(f"outputs: {model_outputs_raw}")
             print(f"targets: {targets}")
             loss = criterion(y_pred=model_outputs_raw, y_true=targets)
+            
+            # Check for NaNs/Infs in loss
+            if torch.isnan(loss).any() or torch.isinf(loss).any():
+                print("!!! NaN or Inf detected in loss !!!")
+                print(f"Loss value: {loss.item()}")
+                # consider raising an error or breaking
+
             loss.backward()
+            
+            # Gradient Clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            
             optimizer.step()
             
             running_loss += loss.item()
             
             predicted_indices = model_outputs_raw.argmax(dim=1)
-            
             total += targets.size(0) # targets are the original integer labels
             correct += predicted_indices.eq(targets).sum().item()
 
@@ -85,6 +104,11 @@ def train(model,
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+
+            if batch_idx % print_every == 0:
+                print(f"Batch {batch_idx + 1}/{len(train_loader)}")
+                print(f"Running loss: {running_loss / (batch_idx + 1)}")
+                print(f"Metrics: {train_metrics}")
         
         train_loss.append(running_loss / len(train_loader))
         train_acc.append(100. * correct / total)
@@ -102,14 +126,6 @@ def train(model,
         for metric_name, metric in metrics.items():
             train_metrics_per_epoch[metric_name][epoch] = train_metrics[metric_name].mean()
             val_metrics_per_epoch[metric_name][epoch] = val_metrics[metric_name].mean()
-
-        # print(f"Memory after epoch: {get_memory_usage()}")
-        loop.set_postfix(
-            train_loss=train_loss[-1], 
-            train_acc=train_acc[-1], 
-            val_loss=val_loss[-1], 
-            val_acc=val_acc[-1]
-        )
 
         # save model
         if not save_model and epoch + 1 < save_patience:

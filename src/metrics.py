@@ -35,9 +35,11 @@ class MatthewsCorrelationCoefficient(torch.nn.Module):
         self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
 
     def update(self, y_true, y_pred):
-        y_true_labels = torch.argmax(y_true, dim=1)
-        y_pred_labels = torch.argmax(y_pred, dim=1)
-
+        y_true_labels = y_true
+        y_pred_labels = y_pred
+        
+        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
+        
         cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
         for t, p in zip(y_true_labels, y_pred_labels):
             cm[t, p] += 1
@@ -75,13 +77,12 @@ class CustomPrecision(torch.nn.Module):
         self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
 
     def update(self, y_true, y_pred):
-        y_true_labels = torch.argmax(y_true, dim=1)
-        y_pred_labels = torch.argmax(y_pred, dim=1)
-
+        y_true_labels = y_true
+        y_pred_labels = y_pred
         cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
         for t, p in zip(y_true_labels, y_pred_labels):
             cm[t, p] += 1
-
+        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
         self.confusion_matrix += cm
 
     def compute(self):
@@ -116,13 +117,13 @@ class CustomRecall(torch.nn.Module):
         self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
 
     def update(self, y_true, y_pred):
-        y_true_labels = torch.argmax(y_true, dim=1)
-        y_pred_labels = torch.argmax(y_pred, dim=1)
+        y_true_labels = y_true
+        y_pred_labels = y_pred
 
         cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
         for t, p in zip(y_true_labels, y_pred_labels):
             cm[t, p] += 1
-
+        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
         self.confusion_matrix += cm
 
     def compute(self):
@@ -190,13 +191,13 @@ class CustomSpecificity(torch.nn.Module):
         self.register_buffer('confusion_matrix', torch.zeros(num_classes, num_classes))
 
     def update(self, y_true, y_pred):
-        y_true_labels = torch.argmax(y_true, dim=1)
-        y_pred_labels = torch.argmax(y_pred, dim=1)
+        y_true_labels = y_true
+        y_pred_labels = y_pred
 
         cm = torch.zeros(self.num_classes, self.num_classes, device=y_true.device)
         for t, p in zip(y_true_labels, y_pred_labels):
             cm[t, p] += 1
-
+        self.confusion_matrix = self.confusion_matrix.to(y_true.device)
         self.confusion_matrix += cm
 
     def compute(self):
