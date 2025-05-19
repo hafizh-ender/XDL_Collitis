@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
+
 import torchvision.models as models
 
 class DenseNet121(nn.Module):
@@ -12,16 +14,9 @@ class DenseNet121(nn.Module):
         """
         super(DenseNet121, self).__init__()
         
-        self.model = models.densenet121(weights='IMAGENET1K_V1')
-        
-        num_features = self.model.classifier.in_features
-        
-        self.model.classifier = nn.Sequential(
-            nn.Linear(num_features, 512),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(512, num_classes)
-        )
+        self.densenet_model = models.densenet121(weights='IMAGENET1K_V1')
+        self.dropout = nn.Dropout(p=dropout_rate)
+        self.classifier = nn.Linear(82944, num_classes)
         
     def forward(self, x):
         """
@@ -33,4 +28,16 @@ class DenseNet121(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, num_classes)
         """
-        return self.model(x) 
+        features = self.densenet_model.features(x)
+        out = F.relu(features, inplace=True)
+        
+        # Add dropout layer
+        out = self.dropout(out)
+
+        # Flatten the output
+        out = torch.flatten(out, 1)
+
+        # Pass through the classifier
+        out = self.classifier(out) 
+        
+        return out
