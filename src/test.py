@@ -17,7 +17,7 @@ def test(model, test_loader, device, criterion, print_every=10, metrics=None):
             targets = torch.tensor([int(t) - 1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
             
             model_outputs_raw = model(data)
-            loss = criterion(y_pred=model_outputs_raw, y_true=targets) # Assuming criterion still uses y_pred, y_true
+            loss = criterion(input = model_outputs_raw, target = targets) # Assuming criterion still uses y_pred, y_true
             test_loss += loss.item()
             
             predicted_indices = model_outputs_raw.argmax(dim=1)
