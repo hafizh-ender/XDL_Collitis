@@ -14,7 +14,7 @@ class MulticlassMCC(Metric):
         self.num_classes = num_classes
         self._add_state("confusion_matrix", torch.zeros(num_classes, num_classes, device=resolved_device))
 
-    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor) -> "Self":
+    def update(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> "Self":
         y_true_labels = y_true
         y_pred_labels = y_pred
         
@@ -60,7 +60,7 @@ class MulticlassSpecificity(Metric):
         self.average = average
         self._add_state("confusion_matrix", torch.zeros(num_classes, num_classes, device=resolved_device))
 
-    def update(self, y_true: torch.Tensor, y_pred: torch.Tensor) -> "Self":
+    def update(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> "Self":
         y_true_labels = y_true
         y_pred_labels = y_pred
 

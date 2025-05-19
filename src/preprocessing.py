@@ -10,8 +10,7 @@ def preprocess(target_input_size, # Expected as (C, H, W)
                vertical_flip=None, 
                brightness_range=None, 
                channel_shift_range=None, 
-               fill_mode='nearest',  # Used for padding mode in geometric transforms
-               drop_out=None):
+               fill_mode='nearest'):
     
     if not (isinstance(target_input_size, (list, tuple)) and len(target_input_size) == 3):
         raise ValueError("target_input_size must be a tuple or list of (C, H, W)")
@@ -59,8 +58,5 @@ def preprocess(target_input_size, # Expected as (C, H, W)
         transform_list.append(
             transforms.ColorJitter(hue=hue_value)
         )
-        
-    if drop_out is not None:
-        transform_list.append(transforms.RandomErasing())
         
     return transforms.Compose(transform_list)

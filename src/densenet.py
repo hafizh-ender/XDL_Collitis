@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 
 class DenseNet121(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, dropout_rate=0.25):
         """
         Initialize DenseNet121 model with custom number of classes
         
@@ -19,7 +19,7 @@ class DenseNet121(nn.Module):
         self.model.classifier = nn.Sequential(
             nn.Linear(num_features, 512),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(dropout_rate),
             nn.Linear(512, num_classes)
         )
         

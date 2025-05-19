@@ -1,5 +1,5 @@
 import torch
-from src.dataset import IterableDataset
+from src.dataset import Dataset
 
 class Loader(torch.utils.data.DataLoader):
     def __init__(self, dataframe, 
@@ -15,10 +15,10 @@ class Loader(torch.utils.data.DataLoader):
         self.dataloader = self.load_data()
 
     def load_data(self):
-        dataset = IterableDataset(dataframe=self.dataframe, transform=self.transform)
+        dataset = Dataset(dataframe=self.dataframe, transform=self.transform)
         return torch.utils.data.DataLoader(dataset, 
                                            batch_size=self.batch_size, 
-                                           shuffle=False,
+                                           shuffle=self.shuffle,
                                            num_workers=self.num_workers)
 
     def __iter__(self):
