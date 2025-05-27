@@ -22,7 +22,7 @@ def preprocess(target_input_size, # Expected as (C, H, W)
     transform_list = [
         transforms.Resize(resize_dims), # Added Resize
         transforms.ToTensor(),
-        transforms.Normalize((0.,), (1/255.,)) # User's current normalization
+        transforms.Lambda(lambda x: x / 255.0) # User's current normalization
     ]
     
     if rotation_range is not None:
