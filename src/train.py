@@ -52,8 +52,11 @@ def train(model,
         if metrics:
             for metric_obj in metrics.values():
                 metric_obj.reset()
-
+        # print(len(train_loader)//32) # checking how many loop in train_loader
+        index = 0
         for batch_idx, (data, targets) in enumerate(train_loader):
+            # print(index)
+            index += 1
             data = data.to(device)
             targets = torch.tensor([int(t)-1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
 
@@ -92,9 +95,9 @@ def train(model,
             if is_scheduler_per_batch(scheduler):
                 scheduler.step()
 
-            del model_outputs_raw, loss, predicted_indices
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            # del model_outputs_raw, loss, predicted_indices
+            # if torch.cuda.is_available():
+            #     torch.cuda.empty_cache()
 
             if (batch_idx + 1) % print_every == 0:
                 print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")

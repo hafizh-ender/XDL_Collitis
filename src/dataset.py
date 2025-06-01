@@ -34,10 +34,14 @@ class IterableDataset(torch.utils.data.IterableDataset):
         return self.dataframe.iloc[index]
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame, transform=None):
-        self.dataframe = dataframe.reset_index(drop=True)
+    def __init__(self, dataframe: pd.DataFrame, transform=None, seed: int = 42, shuffle: bool = True):
         self.transform = transform
-
+        self.seed = seed
+        if shuffle:
+            self.dataframe = dataframe.reset_index(drop=True).sample(frac=1, random_state=self.seed).reset_index(drop=True)
+        else:
+            self.dataframe = dataframe.reset_index(drop=True)
+        
     def __len__(self):
         return len(self.dataframe)
     
