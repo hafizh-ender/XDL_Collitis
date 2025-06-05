@@ -3,7 +3,8 @@ import torch
 import pandas as pd
 import psutil
 import gc
-
+import numpy as np
+import random
 import yaml
 
 def get_filenames(dataset_path):
@@ -13,7 +14,22 @@ def get_filenames(dataset_path):
 
     return filenames
 
-def generate_filenames_df(dataset_dir, categories):
+def set_seed(seed: int):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    np.random.seed(seed)
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    
+def generate_filenames_df(dataset_dir, 
+                          categories, 
+                          shuffle=False, 
+                          seed=42,
+                          is_sample = False,
+                          sample_size = 50):
     full_filenames = {"image_path": [], "class": []}
 
     for category in categories:
@@ -26,6 +42,11 @@ def generate_filenames_df(dataset_dir, categories):
         full_filenames["class"].extend([category] * len(full_filenames_temp))
 
     full_filenames_df = pd.DataFrame.from_dict(full_filenames)
+    if shuffle:
+        full_filenames_df = full_filenames_df.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    if is_sample:
+        full_filenames_df = full_filenames_df.sample(n=sample_size, random_state=seed).reset_index(drop=True)
 
     return full_filenames_df
 
