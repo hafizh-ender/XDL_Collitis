@@ -58,19 +58,20 @@ def train(model,
             # print(index)
             index += 1
             data = data.to(device)
-            targets = torch.tensor([int(t)-1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
-
+            targets = targets.to(device)
+            # targets = torch.tensor([int(t)-1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
             if torch.isnan(data).any() or torch.isinf(data).any():
                 print("!!! NaN or Inf detected in input data !!!")
             
             optimizer.zero_grad()
             
             model_outputs_raw = model(data)
+            # print(f"targets: {targets}\nmodel_outputs_raw: {model_outputs_raw}")
             
             if torch.isnan(model_outputs_raw).any() or torch.isinf(model_outputs_raw).any():
                 print("!!! NaN or Inf detected in model_outputs_raw !!!")
                 print(model_outputs_raw)
-                
+            
             loss = criterion(input=model_outputs_raw, target=targets)
             
             if torch.isnan(loss).any() or torch.isinf(loss).any():
@@ -83,14 +84,15 @@ def train(model,
             
             running_loss += loss.item()
             
-            predicted_indices = model_outputs_raw.argmax(dim=1)
+            predicted_indices = torch.argmax(model_outputs_raw, dim=1)
+            target_indices = torch.argmax(targets, dim=1)
             
             if metrics:
                 for metric_name, metric_obj in metrics.items():
                     if metric_name in ["auroc", "auprc"]:
-                        metric_obj.update(model_outputs_raw, targets)
+                        metric_obj.update(model_outputs_raw, target_indices)
                     else:
-                        metric_obj.update(predicted_indices, targets)
+                        metric_obj.update(predicted_indices, target_indices)
 
             if is_scheduler_per_batch(scheduler):
                 scheduler.step()
@@ -99,8 +101,8 @@ def train(model,
             # if torch.cuda.is_available():
             #     torch.cuda.empty_cache()
 
-            if (batch_idx + 1) % print_every == 0:
-                print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")
+            # if (batch_idx + 1) % print_every == 0:
+            #     print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")
         
         history["train_loss"].append(running_loss / len(train_loader))
         
@@ -112,13 +114,11 @@ def train(model,
                 history["train_metrics"][metric_name].append(metric_val_to_store)
                 epoch_train_metrics_computed[metric_name] = metric_val_to_store
         
-        # Construct print string for train metrics, including accuracy if present
         train_metric_items_str = []
         for name, val in epoch_train_metrics_computed.items():
             if isinstance(val, float):
                 train_metric_items_str.append(f"{name}: {val:.4f}")
             elif isinstance(val, np.ndarray):
-                 # Format numpy array elements, perhaps join them or take a mean/specific element
                 formatted_array = np.array2string(val, formatter={'float_kind':lambda x: "%.4f" % x})
                 train_metric_items_str.append(f"{name}: {formatted_array}")
             else:

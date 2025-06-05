@@ -14,21 +14,22 @@ def test(model, test_loader, device, criterion, print_every=10, metrics=None):
     with torch.no_grad():
         for batch_idx, (data, targets) in enumerate(test_loader):
             data = data.to(device)
-            targets = torch.tensor([int(t) - 1 for t in targets if str(t).isdigit()], dtype=torch.long).to(device)
+            targets = targets.to(device)
             
             model_outputs_raw = model(data)
             loss = criterion(input = model_outputs_raw, target = targets) # Assuming criterion still uses y_pred, y_true
             test_loss += loss.item()
             
-            predicted_indices = model_outputs_raw.argmax(dim=1)
+            predicted_indices = torch.argmax(model_outputs_raw, dim=1)
+            target_indices = torch.argmax(targets, dim=1)
             
             # Update all metrics
             if metrics:
                 for metric_name, metric_obj in metrics.items(): # Renamed to metric_obj for clarity
                     if metric_name in ["auroc", "auprc"]:
-                        metric_obj.update(model_outputs_raw, targets)
+                        metric_obj.update(model_outputs_raw, target_indices)
                     else:
-                        metric_obj.update(predicted_indices, targets)
+                        metric_obj.update(predicted_indices, target_indices)
 
             del model_outputs_raw, loss, predicted_indices
             if torch.cuda.is_available():

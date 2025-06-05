@@ -5,8 +5,11 @@ from torchvision.io import decode_image
 from PIL import Image
 
 class IterableDataset(torch.utils.data.IterableDataset):
-    def __init__(self, dataframe: pd.DataFrame, transform=None):
-        self.dataframe = dataframe.reset_index(drop=True)
+    def __init__(self, dataframe: pd.DataFrame, transform=None, is_sampling: bool = False, sampling_number: int = 50):
+        if is_sampling:
+            self.dataframe = dataframe.reset_index(drop=True)[:sampling_number]
+        else:
+            self.dataframe = dataframe.reset_index(drop=True)
         self.transform = transform
 
     def __iter__(self):
@@ -34,10 +37,23 @@ class IterableDataset(torch.utils.data.IterableDataset):
         return self.dataframe.iloc[index]
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe: pd.DataFrame, transform=None, seed: int = 42, shuffle: bool = True):
+    def __init__(self, 
+                 dataframe: pd.DataFrame, 
+                 categories: list[str],
+                 transform=None, 
+                 seed: int = 42, 
+                 shuffle: bool = True,
+                 is_sampling: bool = False,
+                 sampling_number: int = 50):
         self.transform = transform
         self.seed = seed
-        if shuffle:
+        self.is_sampling = is_sampling
+        self.sampling_number = sampling_number
+        self.categories = categories
+        self.num_classes = len(self.categories)
+        if is_sampling:
+            self.dataframe = dataframe.reset_index(drop=True)[:sampling_number]
+        elif shuffle:
             self.dataframe = dataframe.reset_index(drop=True).sample(frac=1, random_state=self.seed).reset_index(drop=True)
         else:
             self.dataframe = dataframe.reset_index(drop=True)
@@ -47,10 +63,10 @@ class Dataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         row = self.dataframe.iloc[index]
-        # img = decode_image(row["image_path"], mode="RGB")
         img = Image.open(row["image_path"]).convert("RGB")
-        # print(img)
         if self.transform:
             img = self.transform(img)
-        label = row["class"]
+        label = torch.zeros(self.num_classes)
+        label[int(row["class"]) - 1] = 1
+        assert torch.any(label), "Label tensor is empty"
         return img, label
