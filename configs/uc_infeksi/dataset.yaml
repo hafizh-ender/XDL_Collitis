@@ -1,0 +1,17 @@
+DATA_PATH: "datasets"
+TRAIN_DIR: "train"
+VALID_DIR: "valid"
+TEST_DIR: "test"
+PROBLEM: "uc_infeksi"
+IMAGE_SIZE: 299
+IMAGE_CHANNELS: 3 #RGB
+PIN_MEMORY: false
+IS_SHUFFLE: true
+SEED: 42
+SPLIT_RATIO: [0.8, 0.1, 0.1]
+SAMPLING:
+  IS_SAMPLING: false
+  SAMPLING_NUMBER: 50
+
+CATEGORIES: ["uc", "infeksi_non_spesifik"] # make sure the categories are in the same order as the categories in the dataset
+UC_SOURCE: ["limuc", "changsu"]

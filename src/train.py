@@ -3,7 +3,7 @@ import numpy as np
 import os
 import json
 from tqdm import tqdm
-from src.test import test
+from src.val import validate
 from src.utils import (
     get_memory_usage,
     clear_memory,
@@ -22,6 +22,7 @@ def train(model,
           device = get_device(),
           metrics = {},
           print_every = 1,
+          early_stopping = 30,
           save_patience = 10,
           save_path = "",
           save_model = True,
@@ -45,7 +46,7 @@ def train(model,
     loop = tqdm(range(num_epochs), desc="Epochs")
     for epoch in loop:
         clear_memory()
-        print(f"\nEpoch {epoch + 1}/{num_epochs}")
+        # print(f"\nEpoch {epoch + 1}/{num_epochs}")
         
         model.train()
         running_loss = 0.0
@@ -125,9 +126,9 @@ def train(model,
             else:
                 train_metric_items_str.append(f"{name}: {val}")
         train_metrics_str = ", ".join(train_metric_items_str)
-        print(f"Epoch {epoch+1} Train - Loss: {history['train_loss'][-1]:.4f}, Metrics: {{{train_metrics_str}}}")
+        # print(f"Epoch {epoch+1} Train - Loss: {history['train_loss'][-1]:.4f}, Metrics: {{{train_metrics_str}}}")
 
-        val_loss_epoch, val_metrics_computed = test(model, val_loader, device, criterion, print_every, metrics)
+        val_loss_epoch, val_metrics_computed = validate(model, val_loader, device, criterion, print_every, metrics)
         history["val_loss"].append(val_loss_epoch)
         
         if metrics:
@@ -147,7 +148,7 @@ def train(model,
             else:
                 val_metric_items_str.append(f"{name}: {val}")
         val_metrics_str = ", ".join(val_metric_items_str)
-        print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
+        # print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
         if is_scheduler_per_batch(scheduler):
             scheduler.step()
@@ -166,10 +167,10 @@ def train(model,
                 os.makedirs(save_path)
             torch.save(model.state_dict(), os.path.join(save_path, f"epoch_{best_epoch+1}.pth"))
             print(f"Model saved to {os.path.join(save_path, f'epoch_{best_epoch+1}.pth')}")
-        elif epoch > best_epoch and epoch + 1 - best_epoch >= save_patience:
-            print(f"Early stopping triggered after {save_patience} epochs with no improvement since epoch {best_epoch + 1}.")
+        elif epoch > best_epoch and epoch + 1 - best_epoch >= early_stopping:
+            print(f"Early stopping triggered after {early_stopping} epochs with no improvement since epoch {best_epoch + 1}.")
             break
-        loop.set_description(f"Epoch {epoch+1}/{num_epochs} - Loss: {history['train_loss'][-1]:.4f}, Metrics: {{{train_metrics_str}}}")
+        loop.set_postfix(train_loss=history["train_loss"][-1], val_loss=history["val_loss"][-1], train_metrics=train_metrics_str, val_metrics=val_metrics_str)
         clear_memory()
     
     if save_metrics:

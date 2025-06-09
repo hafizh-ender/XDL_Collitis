@@ -6,6 +6,7 @@ import gc
 import numpy as np
 import random
 import yaml
+from .densenet import DenseNet121
 
 def set_seed(seed: int):
     torch.manual_seed(seed)
@@ -41,10 +42,11 @@ def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False
             # print(f"new subdirectories: {subdirectories}")
             continue
 
-        assert len(class_name) == 1, f"Multiple class names found in {subdirectory}"
-        if 'uc' in subdirectory.split('\\') and not source:
-            continue
         if not class_name: #cek the subdirectory is not in the categories
+            continue
+        assert len(class_name) == 1, f"Multiple class names found in {subdirectory}"
+        
+        if 'uc' in subdirectory.split('\\') and not source:
             continue
 
         for file in files:
@@ -138,3 +140,26 @@ def is_scheduler_per_batch(scheduler):
     else:
         return False
 
+def load_model(model_path, num_classes=None, dropout_rate=0.25):
+    """
+    Load a DenseNet121 model from a saved state dict or create a new one
+    
+    Args:
+        model_path (str): Path to the saved model state dict
+        num_classes (int, optional): Number of output classes. Required if creating new model
+        dropout_rate (float, optional): Dropout rate for the model. Defaults to 0.25
+        
+    Returns:
+        DenseNet121: Loaded or newly created model
+    """
+    try:
+        # Try to load the model state dict
+        state_dict = torch.load(model_path)
+        model = DenseNet121(num_classes=num_classes, dropout_rate=dropout_rate)
+        model.load_state_dict(state_dict)
+        return model
+    except:
+        # If loading fails, create a new model
+        if num_classes is None:
+            raise ValueError("num_classes must be specified when creating a new model")
+        return DenseNet121(num_classes=num_classes, dropout_rate=dropout_rate)

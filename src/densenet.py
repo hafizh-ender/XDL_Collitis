@@ -24,10 +24,15 @@ class DenseNet121(nn.Module):
         
         Args:
             x (torch.Tensor): Input tensor of shape (batch_size, channels, height, width)
+                            or (channels, height, width) for single image
             
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, num_classes)
         """
+        # Add batch dimension if input is a single image
+        if x.dim() == 3:
+            x = x.unsqueeze(0)
+            
         features = self.densenet_model.features(x)
         out = F.relu(features, inplace=True)
         
