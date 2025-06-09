@@ -7,13 +7,6 @@ import numpy as np
 import random
 import yaml
 
-def get_filenames(dataset_path):
-    # Get the list of file names
-    filenames = os.listdir(dataset_path)
-    filenames.sort()
-
-    return filenames
-
 def set_seed(seed: int):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -22,8 +15,54 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = True
     np.random.seed(seed)
     random.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)\
     
+def get_filenames(dataset_path):
+    # Get the list of file names
+    filenames = os.listdir(dataset_path)
+    filenames.sort()
+
+    return filenames
+
+def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False, seed = 42, split_ratio=[0.8, 0.1, 0.1]):
+    full_filenames = {"image_path": [], "class": []}
+
+    subdirectories = os.listdir(dataset_dir)
+    # print(f"subdirectories: {subdirectories}")
+    for subdirectory in subdirectories:
+        # print(f"subdirectory: {subdirectory}")
+        files = os.listdir(os.path.join(dataset_dir, subdirectory))
+        class_name = [x for x in categories if x in subdirectory]
+        source = [x for x in uc_source if x in subdirectory]
+
+        if not files[0].endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+            for folder in files:
+                subdirectories.append(os.path.join(subdirectory, folder))
+            # print(f"new subdirectories: {subdirectories}")
+            continue
+
+        assert len(class_name) == 1, f"Multiple class names found in {subdirectory}"
+        if 'uc' in subdirectory.split('\\') and not source:
+            continue
+        if not class_name: #cek the subdirectory is not in the categories
+            continue
+
+        for file in files:
+            full_filenames["image_path"].append(os.path.join(dataset_dir, subdirectory, file))
+            full_filenames["class"].append(class_name[0])
+    full_filenames_df = pd.DataFrame(full_filenames)
+    if shuffle:
+        full_filenames_df = full_filenames_df.sample(frac=1, random_state=seed).reset_index(drop=True)
+
+    train_size = int(len(full_filenames_df) * split_ratio[0])
+    val_size = int(len(full_filenames_df) * split_ratio[1])
+
+    train_filenames = full_filenames_df.iloc[:train_size]
+    val_filenames = full_filenames_df.iloc[train_size:train_size+val_size]
+    test_filenames = full_filenames_df.iloc[train_size+val_size:]
+
+    return train_filenames, val_filenames, test_filenames
+
 def generate_filenames_df(dataset_dir, 
                           categories, 
                           shuffle=False, 

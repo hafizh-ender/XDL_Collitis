@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import os
 import json
+from tqdm import tqdm
 from src.test import test
 from src.utils import (
     get_memory_usage,
@@ -41,8 +42,8 @@ def train(model,
     }
     
     print("Training...")
-    
-    for epoch in range(num_epochs):
+    loop = tqdm(range(num_epochs), desc="Epochs")
+    for epoch in loop:
         clear_memory()
         print(f"\nEpoch {epoch + 1}/{num_epochs}")
         
@@ -168,7 +169,7 @@ def train(model,
         elif epoch > best_epoch and epoch + 1 - best_epoch >= save_patience:
             print(f"Early stopping triggered after {save_patience} epochs with no improvement since epoch {best_epoch + 1}.")
             break
-
+        loop.set_description(f"Epoch {epoch+1}/{num_epochs} - Loss: {history['train_loss'][-1]:.4f}, Metrics: {{{train_metrics_str}}}")
         clear_memory()
     
     if save_metrics:
