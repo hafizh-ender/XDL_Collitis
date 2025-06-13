@@ -29,9 +29,9 @@ def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False
     full_filenames = {"image_path": [], "class": []}
 
     subdirectories = os.listdir(dataset_dir)
-    # print(f"subdirectories: {subdirectories}")
+    print(f"subdirectories: {subdirectories}")
     for subdirectory in subdirectories:
-        # print(f"subdirectory: {subdirectory}")
+        print(f"subdirectory: {subdirectory}")
         files = os.listdir(os.path.join(dataset_dir, subdirectory))
         class_name = [x for x in categories if x in subdirectory]
         source = [x for x in uc_source if x in subdirectory]

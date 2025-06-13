@@ -14,4 +14,4 @@ SAMPLING:
   SAMPLING_NUMBER: 50
 
 CATEGORIES: ["uc", "infeksi_non_spesifik"] # make sure the categories are in the same order as the categories in the dataset
-UC_SOURCE: ["limuc", "changsu"]
+UC_SOURCE: ["limuc", "changsu", "hyperkvasir"]
