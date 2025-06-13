@@ -1,3 +1,4 @@
+import os
 import torch
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
@@ -7,7 +8,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_XDL_GradCAM(model, test_loader, device, num_samples=5, print_every=10):
+def plot_XDL_GradCAM(model, test_loader, device, num_samples=5, print_img = False,print_every=10, save_path=None):
     model.eval()
     target_layer = model.densenet_model.features.denseblock4
     categories = test_loader.dataset.categories
@@ -43,17 +44,25 @@ def plot_XDL_GradCAM(model, test_loader, device, num_samples=5, print_every=10):
             cam_image = show_cam_on_image(img, grayscale_cam, use_rgb=True)
             
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-
-            ax1.imshow(img)
+            if print_img:
+                ax1.imshow(img)
             ax1.set_title(f'Original Image\nTrue: {categories[true_idx]}, Pred: {categories[pred_idx]}')
             ax1.axis('off')
             
-            ax2.imshow(cam_image)
+            if print_img:
+                ax2.imshow(cam_image)
             ax2.set_title('GradCAM Visualization')
             ax2.axis('off')
             
             plt.tight_layout()
-            plt.show()
+            if save_path:
+                os.makedirs(save_path, exist_ok=True)
+                plt.savefig(os.path.join(save_path, f'{samples_processed}.png'))
+                plt.close()
+            elif print_img:
+                plt.show()
+            else:
+                plt.close()
             samples_processed += 1
         if batch_idx % print_every == 0:
             print(f'Processed {samples_processed} samples')

@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
-def test(model, test_loader, device, print_every=10):
+def test(model, test_loader, device, verbose=False, print_every=10):
     model.eval()
     raw_predictions = []
     target_indices = []
@@ -17,7 +17,7 @@ def test(model, test_loader, device, print_every=10):
             predicted_indices.append(torch.argmax(model_outputs_raw, dim=1).detach().cpu().numpy())
             target_indices.append(torch.argmax(targets, dim=1).detach().cpu().numpy())
             
-            if (batch_idx + 1) % print_every == 0:
+            if (batch_idx + 1) % print_every == 0 and verbose:
                 print(f"Batch {batch_idx + 1}/{len(test_loader)}")
 
             if torch.cuda.is_available():
