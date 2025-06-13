@@ -46,12 +46,13 @@ def plot_XDL_GradCAM(model, test_loader, device, num_samples=5, print_img = Fals
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
             if print_img:
                 ax1.imshow(img)
-            ax1.set_title(f'Original Image\nTrue: {categories[true_idx]}, Pred: {categories[pred_idx]}')
+            image_path = test_loader.dataset.dataframe.iloc[samples_processed]['image_path']
+            ax1.set_title(f'Original Image: {image_path}\nTrue: {categories[true_idx]}, Pred: {categories[pred_idx]}')
             ax1.axis('off')
             
             if print_img:
                 ax2.imshow(cam_image)
-            ax2.set_title('GradCAM Visualization')
+            ax2.set_title(f'GradCAM Visualization: {image_path}')
             ax2.axis('off')
             
             plt.tight_layout()
