@@ -23,45 +23,29 @@ def smoothgrad(model, input_tensor, target_class, n_samples=100, noise_level=0.0
         SmoothGrad saliency map
     """
     model.eval()
-    input_tensor.requires_grad = True
-    
-    # Initialize gradient accumulation
     accumulated_gradients = torch.zeros_like(input_tensor)
-    
-    # Calculate input range for noise scaling
     input_range = torch.max(input_tensor) - torch.min(input_tensor)
     scaled_noise_level = noise_level * input_range
-    
+
     for _ in range(n_samples):
-        # Add scaled noise to input
-        noise = torch.randn_like(input_tensor) * scaled_noise_level
-        noisy_input = input_tensor + noise
-        
-        # Forward pass
+        # Clone and detach input for each sample
+        noisy_input = input_tensor + torch.randn_like(input_tensor) * scaled_noise_level
+        noisy_input = noisy_input.clone().detach().requires_grad_(True)
+
         output = model(noisy_input)
-        
         if len(output.shape) == 1:
             output = output.unsqueeze(0)
-            
-        # Zero gradients
+
         model.zero_grad()
-        
-        # Compute gradients
         loss = output[0, target_class]
         loss.backward()
-        
-        # Accumulate gradients
-        if input_tensor.grad is not None:
-            accumulated_gradients += input_tensor.grad.data
-            input_tensor.grad.data.zero_()
-    
-    # Average gradients
+
+        if noisy_input.grad is not None:
+            accumulated_gradients += noisy_input.grad.data
+
     smoothgrad_map = accumulated_gradients / n_samples
-    
-    # Take absolute value and normalize
     smoothgrad_map = torch.abs(smoothgrad_map)
     smoothgrad_map = (smoothgrad_map - smoothgrad_map.min()) / (smoothgrad_map.max() - smoothgrad_map.min() + 1e-8)
-    
     return smoothgrad_map[0].cpu().numpy()
 
 def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img=False, print_every=10, save_path=None):
@@ -107,9 +91,19 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             smoothgrad_map = np.transpose(smoothgrad_map, (1, 2, 0))
             smoothgrad_map = np.mean(smoothgrad_map, axis=2)  # Convert to grayscale
             smoothgrad_map = cv2.resize(smoothgrad_map, (img.shape[1], img.shape[0]))
-            smoothgrad_map = np.uint8(255 * smoothgrad_map)
-            smoothgrad_map = cv2.applyColorMap(smoothgrad_map, cv2.COLORMAP_JET)
-            smoothgrad_map = cv2.addWeighted(np.uint8(255 * img), 0.6, smoothgrad_map, 0.4, 0)
+            
+            # Increase contrast by clipping at 99th percentile and re-normalizing
+            p99 = np.percentile(smoothgrad_map, 99)
+            if p99 > 0:
+                smoothgrad_map = np.clip(smoothgrad_map, 0, p99)
+                smoothgrad_map = (smoothgrad_map - smoothgrad_map.min()) / (p99 - smoothgrad_map.min() + 1e-8)
+
+            # Improve visualization
+            smoothgrad_map = (smoothgrad_map * 255).astype(np.uint8)
+            heatmap = cv2.applyColorMap(smoothgrad_map, cv2.COLORMAP_VIRIDIS)
+            
+            # Adjust overlay weights for better visibility
+            overlay = cv2.addWeighted(np.uint8(255 * img), 0.6, heatmap, 0.4, 0) # More weight to heatmap
             
             # Create visualization
             fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
@@ -125,7 +119,7 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             ax2.axis('off')
             
             if print_img:
-                ax3.imshow(smoothgrad_map)
+                ax3.imshow(overlay)
             ax3.set_title('SmoothGrad Visualization')
             ax3.axis('off')
             
@@ -245,12 +239,18 @@ def plot_XDL_SmoothGrad(model,
             smoothgrad_map = np.mean(smoothgrad_map, axis=2)  # Convert to grayscale
             smoothgrad_map = cv2.resize(smoothgrad_map, (img.shape[1], img.shape[0]))
             
+            # Increase contrast by clipping at 99th percentile and re-normalizing
+            p99 = np.percentile(smoothgrad_map, 99)
+            if p99 > 0:
+                smoothgrad_map = np.clip(smoothgrad_map, 0, p99)
+                smoothgrad_map = (smoothgrad_map - smoothgrad_map.min()) / (p99 - smoothgrad_map.min() + 1e-8)
+
             # Improve visualization
             smoothgrad_map = (smoothgrad_map * 255).astype(np.uint8)
-            heatmap = cv2.applyColorMap(smoothgrad_map, cv2.COLORMAP_VIRIDIS)  # Changed to VIRIDIS colormap
+            heatmap = cv2.applyColorMap(smoothgrad_map, cv2.COLORMAP_VIRIDIS)
             
             # Adjust overlay weights for better visibility
-            overlay = cv2.addWeighted(np.uint8(255 * img), 0.7, heatmap, 0.3, 0)  # More weight to original image
+            overlay = cv2.addWeighted(np.uint8(255 * img), 0.6, heatmap, 0.4, 0) # More weight to heatmap
             
             # Create visualization
             plt.figure(figsize=(10, 5))
