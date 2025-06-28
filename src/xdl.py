@@ -93,6 +93,10 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             img = data[i].cpu().numpy()
             pred_idx = predicted_indices[i].item()
             true_idx = target_indices[i].item()
+            
+            # if pred_idx != true_idx:
+            #     continue
+            
             img = np.transpose(img, (1, 2, 0))
             img = (img - img.min()) / (img.max() - img.min())
             img_uint8 = (img * 255).astype(np.uint8)
@@ -124,30 +128,77 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             overlay = cv2.addWeighted(img_uint8, 1 - smoothgrad_overlay_alpha, heatmap, smoothgrad_overlay_alpha, 0)
             
             # Create visualization
-            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
-            ax1.imshow(img)
-            ax1.set_title(f'True: {categories[true_idx]}, Pred: {categories[pred_idx]}')
-            ax1.axis('off')
+            fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(18, 10))
             
-            ax2.imshow(cam_image)
-            ax2.set_title('GradCAM Visualization')
-            ax2.axis('off')
-            
+            # Firs row, First column: original image with label information
+            axes[0, 0].imshow(img)
+            axes[0, 0].set_title(f'True: {categories[true_idx]}, Pred: {categories[pred_idx]}\nConfidence: {torch.nn.functional.softmax(model_outputs_raw[i], dim=0)[pred_idx]:.4f}')
+            axes[0, 0].axis('off')
+
+            # First row, Second column: GradCAM visualization
+            axes[0, 1].imshow(cam_image)
+            axes[0, 1].set_title('GradCAM Visualization')
+            axes[0, 1].axis('off')
+
             # Add colorbar for GradCAM
             norm_cam = colors.Normalize(vmin=grayscale_cam.min(), vmax=grayscale_cam.max())
             sm_cam = plt.cm.ScalarMappable(cmap='jet', norm=norm_cam)
             sm_cam.set_array([])
-            fig.colorbar(sm_cam, ax=ax2, shrink=0.8)
+            fig.colorbar(sm_cam, ax=axes[0, 1], shrink=0.8)
 
-            ax3.imshow(overlay)
-            ax3.set_title('SmoothGrad Visualization')
-            ax3.axis('off')
+            # First row, Third column: SmoothGrad visualization
+            axes[0, 2].imshow(overlay)
+            axes[0, 2].set_title('SmoothGrad Visualization')
+            axes[0, 2].axis('off')
             
             # Add colorbar for SmoothGrad
             norm_smooth = colors.Normalize(vmin=smoothgrad_map.min(), vmax=smoothgrad_map.max())
             sm_smooth = plt.cm.ScalarMappable(cmap='viridis', norm=norm_smooth)
             sm_smooth.set_array([])
-            fig.colorbar(sm_smooth, ax=ax3, shrink=0.8)
+            fig.colorbar(sm_smooth, ax=axes[0, 2], shrink=0.8)
+            
+            # Second row, First column: original image with filter (only show pixels if SmoothGrad value above threshold)
+            threshold = 0.5
+            
+            # Add channel dimension if needed
+            smoothgrad_map_copy = smoothgrad_map.copy()
+            if len(smoothgrad_map_copy.shape) == 2:
+                smoothgrad_map_copy = np.expand_dims(smoothgrad_map_copy, axis=-1)
+                smoothgrad_map_copy = np.repeat(smoothgrad_map_copy, repeats=3, axis=-1)
+
+            filtered_img = np.where(smoothgrad_map_copy > threshold, img, 1)
+            axes[1, 0].imshow(filtered_img)
+            axes[1, 0].set_title(f'Filtered Image (SmoothGrad > {threshold})')
+            axes[1, 0].axis('off')
+            
+            # Second row, Third column: SmoothGrad heatmap
+            axes[1, 2].imshow(smoothgrad_map, cmap='viridis')
+            axes[1, 2].set_title('SmoothGrad Heatmap')
+            axes[1, 2].axis('off')
+            
+            # Add colorbar for SmoothGrad heatmap
+            sm_smooth_heatmap = plt.cm.ScalarMappable(cmap='viridis', norm=colors.Normalize(vmin=smoothgrad_map.min(), vmax=smoothgrad_map.max()))
+            sm_smooth_heatmap.set_array([])
+            fig.colorbar(sm_smooth_heatmap, ax=axes[1, 2], shrink=0.8)
+            
+            # Third row, Second column: original image with filter (only show pixels if GradCAM value above threshold)
+            cam_threshold = 0.5
+            
+            # Add channel dimension if needed
+            cam_image_copy = grayscale_cam.copy()
+            if len(cam_image_copy.shape) == 2:
+                cam_image_copy = np.expand_dims(cam_image_copy, axis=-1)
+                cam_image_copy = np.repeat(cam_image_copy, repeats=3, axis=-1)
+            filtered_cam_img = np.where(cam_image_copy > cam_threshold, img, 1)
+            axes[1, 1].imshow(filtered_cam_img)
+            axes[1, 1].set_title(f'Filtered Image (GradCAM > {cam_threshold})')
+            axes[1, 1].axis('off')
+            
+            # Add colorbar (to adjust spacing) but make it invisible
+            norm_cam_invis = colors.Normalize(vmin=0, vmax=0)
+            sm_cam_invis = plt.cm.ScalarMappable(cmap='Greys', norm=norm_cam_invis)
+            sm_cam_invis.set_array([])
+            fig.colorbar(sm_cam_invis, ax=axes[1, 1], shrink=0.8)
 
             plt.tight_layout()
             if save_path:
