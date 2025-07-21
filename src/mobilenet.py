@@ -4,20 +4,20 @@ from torch.nn import functional as F
 
 import torchvision.models as models
 
-class DenseNet121(nn.Module):
+class MobileNetV3(nn.Module):
     def __init__(self, num_classes, dropout_rate=0.25):
         """
-        Initialize DenseNet121 model with custom number of classes
-        
+        Initialize MobileNetV3 model with custom number of classes
+
         Args:
             num_classes (int): Number of output classes for classification
         """
-        super(DenseNet121, self).__init__()
-        
-        self.densenet_model = models.densenet121(weights='IMAGENET1K_V1')
+        super(MobileNetV3, self).__init__()
+
+        self.mobilenet_model = models.mobilenet_v3_small(weights='IMAGENET1K_V1')
         self.dropout = nn.Dropout(p=dropout_rate)
-        self.classifier = nn.Linear(82944, num_classes)
-        
+        self.classifier = nn.Linear(57600, num_classes)
+
     def forward(self, x):
         """
         Forward pass of the model
@@ -32,18 +32,13 @@ class DenseNet121(nn.Module):
         # Add batch dimension if input is a single image
         if x.dim() == 3:
             x = x.unsqueeze(0)
-            
-        features = self.densenet_model.features(x)
-        out = F.relu(features, inplace=True)
+
+        x = self.mobilenet_model.features(x)
         
         if self.training:
-            # Apply dropout only during training
-            out = self.dropout(out)
-
-        # Flatten the output
-        out = torch.flatten(out, 1)
-
-        # Pass through the classifier
-        out = self.classifier(out) 
+            x = self.dropout(x)
         
-        return out
+        # x = self.mobilenet_model.avgpool(x)
+        x = torch.flatten(x, 1)
+
+        return self.classifier(x)

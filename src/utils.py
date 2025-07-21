@@ -29,7 +29,9 @@ def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False
     full_filenames = {"image_path": [], "class": []}
 
     subdirectories = os.listdir(dataset_dir)
+    
     print(f"subdirectories: {subdirectories}")
+    
     for subdirectory in subdirectories:
         print(f"subdirectory: {subdirectory}")
         files = os.listdir(os.path.join(dataset_dir, subdirectory))
@@ -52,7 +54,9 @@ def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False
         for file in files:
             full_filenames["image_path"].append(os.path.join(dataset_dir, subdirectory, file))
             full_filenames["class"].append(class_name[0])
+            
     full_filenames_df = pd.DataFrame(full_filenames)
+    
     if shuffle:
         full_filenames_df = full_filenames_df.sample(frac=1, random_state=seed).reset_index(drop=True)
 
