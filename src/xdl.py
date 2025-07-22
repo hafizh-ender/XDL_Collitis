@@ -71,6 +71,8 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
     """
     model.eval()
 
+    print(f"Using model: {model.__class__.__name__}")
+
     if isinstance(model, DenseNet121):
         target_layer = model.densenet_model.features[-1]
     elif isinstance(model, ResNet50):
@@ -90,13 +92,18 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
     lime_explainer = lime_image.LimeImageExplainer()
 
     samples_processed = 0
+
+    samples_processed_per_class = {i: 0 for i in range(len(categories))}
+    max_samples_per_class = num_samples // len(categories) if num_samples > len(categories) else num_samples
+
     for batch_idx, (data, targets) in enumerate(test_loader):
-        if samples_processed < 55:
-            samples_processed += 1
-            continue  # Skip first 55 samples
+        # if samples_processed < 55:
+        #     samples_processed += 1
+        #     continue  # Skip first 55 samples
         
         if samples_processed >= num_samples:
             break
+
             
         data = data.to(device)
         targets = targets.to(device)
@@ -106,11 +113,20 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             predicted_indices = torch.argmax(model_outputs_raw, dim=1)
             target_indices = torch.argmax(targets, dim=1)
         
+        # Check if we have enough samples for each class
+        for i in range(len(categories)):
+            if samples_processed_per_class[i] >= max_samples_per_class:
+                continue
+
+        print(f'Processing batch {batch_idx + 1}, samples processed: {samples_processed}')
+        
         for i in range(min(len(data), num_samples - samples_processed)):
             img = data[i].cpu().numpy()
             pred_idx = predicted_indices[i].item()
             true_idx = target_indices[i].item()
-            
+
+            print(f'Processing sample {samples_processed + 1}, raw prediction: {model_outputs_raw[i].cpu().numpy()}, predicted index: {pred_idx}, true index: {true_idx}')
+
             # if pred_idx != true_idx:
             #     continue
             
