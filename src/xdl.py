@@ -9,6 +9,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
+from src.densenet import DenseNet121
+from src.resnet import ResNet50
+
 def smoothgrad(model, input_tensor, target_class, n_samples=100, noise_level=0.05):
     """
     Compute SmoothGrad saliency map
@@ -67,7 +70,13 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
         smoothgrad_overlay_alpha: Alpha value for SmoothGrad overlay (default: 0.5)
     """
     model.eval()
-    target_layer = model.densenet_model.features.denseblock4
+
+    print(f"Using model: {model.__class__.__name__}")
+
+    if isinstance(model, DenseNet121):
+        target_layer = model.densenet_model.features[-1]
+    elif isinstance(model, ResNet50):
+        target_layer = model.resnet_model.layer4[-1]
     categories = test_loader.dataset.categories
     
     # Initialize GradCAM
@@ -76,10 +85,25 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
         target_layers=[target_layer]
     )
     
+    # Create LIME explainer once, outside the loops
+    import lime
+    from lime import lime_image
+    from skimage.segmentation import mark_boundaries
+    lime_explainer = lime_image.LimeImageExplainer()
+
     samples_processed = 0
+
+    samples_processed_per_class = {i: 0 for i in range(len(categories))}
+    max_samples_per_class = num_samples // len(categories) if num_samples > len(categories) else num_samples
+
     for batch_idx, (data, targets) in enumerate(test_loader):
+        # if samples_processed < 55:
+        #     samples_processed += 1
+        #     continue  # Skip first 55 samples
+        
         if samples_processed >= num_samples:
             break
+
             
         data = data.to(device)
         targets = targets.to(device)
@@ -89,11 +113,20 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             predicted_indices = torch.argmax(model_outputs_raw, dim=1)
             target_indices = torch.argmax(targets, dim=1)
         
+        # Check if we have enough samples for each class
+        for i in range(len(categories)):
+            if samples_processed_per_class[i] >= max_samples_per_class:
+                continue
+
+        print(f'Processing batch {batch_idx + 1}, samples processed: {samples_processed}')
+        
         for i in range(min(len(data), num_samples - samples_processed)):
             img = data[i].cpu().numpy()
             pred_idx = predicted_indices[i].item()
             true_idx = target_indices[i].item()
-            
+
+            print(f'Processing sample {samples_processed + 1}, raw prediction: {model_outputs_raw[i].cpu().numpy()}, predicted index: {pred_idx}, true index: {true_idx}')
+
             # if pred_idx != true_idx:
             #     continue
             
@@ -181,7 +214,7 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             sm_smooth_heatmap.set_array([])
             fig.colorbar(sm_smooth_heatmap, ax=axes[1, 2], shrink=0.8)
             
-            # Third row, Second column: original image with filter (only show pixels if GradCAM value above threshold)
+            # Second row, Second column: original image with filter (only show pixels if GradCAM value above threshold)
             cam_threshold = 0.5
             
             # Add channel dimension if needed
@@ -200,11 +233,88 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             sm_cam_invis.set_array([])
             fig.colorbar(sm_cam_invis, ax=axes[1, 1], shrink=0.8)
 
-            plt.tight_layout()
-            if save_path:
-                os.makedirs(save_path, exist_ok=True)
-                plt.savefig(os.path.join(save_path, f'{samples_processed}.png'))
+            # # Third row, First column: LIME visualization (fixed usage)
+            # # Define model_predict for LIME: expects float32 numpy array (N, H, W, C), returns probabilities
+            # def model_predict(images_np):
+            #     model.eval()
+                
+            #     # Ensure images_np is a numpy array with shape (N, H, W, C)
+            #     images_np = images_np.astype(np.float32)
+                
+            #     # Normalize if values are in range [0, 255]
+            #     if images_np.max() > 1.0:
+            #         images_np = images_np / 255.0
+                    
+            #     # Ensure images_np has shape (N, H, W, C)
+            #     if images_np.ndim == 3:
+            #         images_np = np.expand_dims(images_np, 0)
+                    
+            #     # Convert to PyTorch tensor and permute to (N, C, H, W)
+            #     images_tensor = torch.from_numpy(images_np).permute(0, 3, 1, 2).to(device)
+
+            #     # Apply normalization
+            #     mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(device)
+            #     std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(device)
+            #     images_tensor = (images_tensor - mean) / std
+                
+            #     # No gradient tracking needed for inference
+            #     with torch.no_grad():
+            #         outputs = model(images_tensor)
+            #         probs = torch.nn.functional.softmax(outputs, dim=1)
+                    
+            #     # Return probabilities as numpy array
+            #     return probs.cpu().numpy()
+
+            # # Prepare image for LIME
+            # img_lime = img.copy()
+            # img_lime = img.astype(np.float32)
+            # img_lime = (img_lime - img_lime.min()) / (img_lime.max() - img_lime.min() + 1e-8)
+
+            # explanation = lime_explainer.explain_instance(
+            #     img_lime,
+            #     model_predict,
+            #     top_labels=2,
+            #     hide_color=0,
+            #     num_samples=1000,
+            #     batch_size=32,
+            # )
+
+            # # Use the label that LIME actually explained
+            # lime_label = pred_idx
+            # if lime_label not in explanation.local_exp:
+            #     lime_label = explanation.top_labels[0]
+            #     print(f"[LIME] Warning: pred_idx {pred_idx} not in explanation, using label {lime_label} instead.")
+
+            # temp, mask = explanation.get_image_and_mask(
+            #     label=lime_label,
+            #     positive_only=True,
+            #     num_features=10,
+            #     hide_rest=False
+            # )
+
+            # lime_img = mark_boundaries(temp, mask, mode='thick', color=(0.223529412, 1., 0.0784313725), outline_color=(0, 0, 0))
+            # # lime_img = mark_boundaries(temp, mask)
+            # axes[2, 0].imshow(lime_img)
             
+            # axes[2, 0].set_title('LIME Visualization')
+            # axes[2, 0].axis('off')
+
+            # # Turn rest of axes off
+            # axes[2, 1].axis('off')
+            # axes[2, 2].axis('off')
+
+            plt.tight_layout()
+
+            if save_path:
+                true_label = categories[true_idx]
+                pred_label = categories[pred_idx]
+                os.makedirs(save_path, exist_ok=True)
+                
+                if pred_label == true_label:
+                    plt.savefig(os.path.join(save_path, f'{true_label}_{samples_processed}.png'))
+                else:
+                    plt.savefig(os.path.join(save_path, f'wrong_{true_label}_{samples_processed}.png'))
+
             if print_img:
                 plt.show()
 
@@ -217,7 +327,12 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
 # Keep the original plot_XDL_GradCAM function for backward compatibility
 def plot_XDL_GradCAM(model, test_loader, device, fontsize=13, num_samples=5, print_img=False, print_every=10, save_path=None):
     model.eval()
-    target_layer = model.densenet_model.features.denseblock4
+
+    if isinstance(model, DenseNet121):
+        target_layer = model.densenet_model.features[-1]
+    elif isinstance(model, ResNet50):
+        target_layer = model.resnet_model.layer4[-1]
+
     categories = test_loader.dataset.categories
     cam = GradCAM(
         model=model,

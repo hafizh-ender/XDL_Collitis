@@ -1,0 +1,30 @@
+MODEL_NAME: "DENSENET121"
+CAPSNET:
+  NAME: "efficientcapsnet"
+  PROBLEM_TYPE: "LIMUC"
+  ARTIFACT_DIR: "artifacts"
+  INPUT_SIZE: [3, 299, 299]
+  CNN_HIDDEN_LAYERS: [32, 32, 64, 64, 64, 128, 128]
+  CNN_KERNEL_STRIDE: [[5], [3], [3], [3, 2], [3, 2], [3, 2], [3, 2]]
+  F: 128
+  K: 3
+  N: 128
+  D: 64 #8*8
+  S: 2
+  DIGICAPS: 32
+
+DENSENET121:
+  NAME: "densenet121"
+  PROBLEM_TYPE: "LIMUC"
+  ARTIFACT_DIR: "artifacts"
+  NUM_CLASSES: 3
+  DROPOUT_RATE: 0.25
+  INPUT_SIZE: [3, 299, 299]
+
+RESNET50:
+  NAME: "resnet50"
+  PROBLEM_TYPE: "LIMUC"
+  ARTIFACT_DIR: "artifacts"
+  NUM_CLASSES: 3
+  DROPOUT_RATE: 0.25
+  INPUT_SIZE: [3, 299, 299]

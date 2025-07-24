@@ -36,8 +36,9 @@ class DenseNet121(nn.Module):
         features = self.densenet_model.features(x)
         out = F.relu(features, inplace=True)
         
-        # Add dropout layer
-        out = self.dropout(out)
+        if self.training:
+            # Apply dropout only during training
+            out = self.dropout(out)
 
         # Flatten the output
         out = torch.flatten(out, 1)

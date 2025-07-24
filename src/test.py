@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+
 def test(model, test_loader, device, verbose=False, print_every=10, metrics=None):
     model.eval()
     raw_predictions = []
@@ -33,8 +34,9 @@ def test(model, test_loader, device, verbose=False, print_every=10, metrics=None
         for metric_name, metric_obj in metrics.items():
             if metric_name in ["auroc", "auprc"]:
                 # For binary classification metrics, use the positive class probabilities
-                positive_class_probs = raw_predictions_flattened[:, 1]  # Get probabilities for class 1
-                metric_obj.update(positive_class_probs, target_indices_flattened)
+                # positive_class_probs = raw_predictions_flattened[:, 1]  # Get probabilities for class 1
+                metric_obj.update(raw_predictions_flattened, target_indices_flattened)
+                # metric_obj.update(positive_class_probs, target_indices_flattened)
             else:
                 metric_obj.update(predicted_indices_flattened, target_indices_flattened)
             val = metric_obj.compute().clone().detach().cpu()
