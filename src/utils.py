@@ -25,38 +25,38 @@ def get_filenames(dataset_path):
 
     return filenames
 
-def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False, seed = 42, split_ratio=[0.8, 0.1, 0.1]):
+def split_dataset(dataset_dir, class_sources: dict, shuffle = False, seed = 42, split_ratio=[0.8, 0.1, 0.1]):
+
     full_filenames = {"image_path": [], "class": []}
 
-    subdirectories = os.listdir(dataset_dir)
-    
-    print(f"subdirectories: {subdirectories}")
-    
-    for subdirectory in subdirectories:
-        print(f"subdirectory: {subdirectory}")
-        files = os.listdir(os.path.join(dataset_dir, subdirectory))
-        class_name = [x for x in categories if x in subdirectory]
-        source = [x for x in uc_source if x in subdirectory]
-
-        if not files[0].endswith(('.jpg', '.jpeg', '.png', '.bmp')):
-            for folder in files:
-                subdirectories.append(os.path.join(subdirectory, folder))
-            # print(f"new subdirectories: {subdirectories}")
-            continue
-
-        if not class_name: #cek the subdirectory is not in the categories
-            continue
-        assert len(class_name) == 1, f"Multiple class names found in {subdirectory}"
-        
-        if 'uc' in subdirectory.split('\\') and not source:
-            continue
-
-        for file in files:
-            full_filenames["image_path"].append(os.path.join(dataset_dir, subdirectory, file))
-            full_filenames["class"].append(class_name[0])
+    for class_label, source_paths in class_sources.items():
+        for source_path in source_paths:
+            source_dir = os.path.join(dataset_dir, source_path)
             
-    full_filenames_df = pd.DataFrame(full_filenames)
+            if not os.path.exists(source_dir):
+                print(f"Warning: Source directory {source_dir} does not exist")
+                continue
+            
+            subdirectories = [d for d in os.listdir(source_dir) 
+                            if os.path.isdir(os.path.join(source_dir, d))]
+            
+            if subdirectories:
+                #kalau ga specified, ambil semua
+                for subdir in subdirectories:
+                    subdir_path = os.path.join(source_dir, subdir)
+                    files = get_filenames(subdir_path)
+                    
+                    for file in files:
+                        full_filenames["image_path"].append(os.path.join(subdir_path, file))
+                        full_filenames["class"].append(class_label)
+            else:
+                files = get_filenames(source_dir)
+                
+                for file in files:
+                    full_filenames["image_path"].append(os.path.join(source_dir, file))
+                    full_filenames["class"].append(class_label)
     
+    full_filenames_df = pd.DataFrame(full_filenames)
     if shuffle:
         full_filenames_df = full_filenames_df.sample(frac=1, random_state=seed).reset_index(drop=True)
 
@@ -70,21 +70,39 @@ def split_dataset(dataset_dir, categories, uc_source: list[str], shuffle = False
     return train_filenames, val_filenames, test_filenames
 
 def generate_filenames_df(dataset_dir, 
-                          categories, 
+                          class_sources: dict, 
                           shuffle=False, 
                           seed=42,
                           is_sample = False,
                           sample_size = 50):
     full_filenames = {"image_path": [], "class": []}
 
-    for category in categories:
-        full_filenames_temp = get_filenames(os.path.join(dataset_dir, category))
-
-        for i in range(len(full_filenames_temp)):
-            full_filenames_temp[i] = os.path.join(dataset_dir, category, full_filenames_temp[i])
-
-        full_filenames["image_path"].extend(full_filenames_temp)
-        full_filenames["class"].extend([category] * len(full_filenames_temp))
+    for class_label, source_paths in class_sources.items():
+        for source_path in source_paths:
+            source_dir = os.path.join(dataset_dir, source_path)
+            
+            if not os.path.exists(source_dir):
+                print(f"Warning: Source directory {source_dir} does not exist")
+                continue
+            
+            subdirectories = [d for d in os.listdir(source_dir) 
+                            if os.path.isdir(os.path.join(source_dir, d))]
+            
+            if subdirectories:
+                #kalau ga specified, ambil semua
+                for subdir in subdirectories:
+                    subdir_path = os.path.join(source_dir, subdir)
+                    files = get_filenames(subdir_path)
+                    
+                    for file in files:
+                        full_filenames["image_path"].append(os.path.join(subdir_path, file))
+                        full_filenames["class"].append(class_label)
+            else:
+                files = get_filenames(source_dir)
+                
+                for file in files:
+                    full_filenames["image_path"].append(os.path.join(source_dir, file))
+                    full_filenames["class"].append(class_label)
 
     full_filenames_df = pd.DataFrame.from_dict(full_filenames)
     if shuffle:
