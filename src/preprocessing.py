@@ -49,14 +49,19 @@ def preprocess(target_input_size, # Expected as (C, H, W)
         
     if brightness_range is not None:
         transform_list.append(
-            transforms.ColorJitter(brightness=brightness_range[1]-brightness_range[0])
+            transforms.ColorJitter(brightness=(0.4, 0.9))
         )
         
     if channel_shift_range is not None:
         # Clamp the channel_shift_range to ensure it falls within the acceptable range
-        hue_value = max(min(channel_shift_range/255.0, 0.5), -0.5)
+        hue_value = max(min(channel_shift_range/255.0, 0.4), -0.5)
         transform_list.append(
             transforms.ColorJitter(hue=hue_value)
         )
+        
+        transform_list.append(
+            transforms.ColorJitter(saturation=0.4, contrast=0.4)
+        )
+    
         
     return transforms.Compose(transform_list)
