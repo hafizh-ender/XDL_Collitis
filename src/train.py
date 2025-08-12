@@ -9,7 +9,8 @@ from src.utils import (
     clear_memory,
     get_device,
     is_best_model,
-    is_scheduler_per_batch
+    is_scheduler_per_batch,
+    is_scheduler_requires_val
 )
 
 def train(model, 
@@ -106,6 +107,10 @@ def train(model,
             # if (batch_idx + 1) % print_every == 0:
             #     print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")
         
+        
+        if not is_scheduler_per_batch(scheduler) and not is_scheduler_requires_val(scheduler):
+            scheduler.step()
+        
         history["train_loss"].append(running_loss / len(train_loader))
         
         epoch_train_metrics_computed = {}
@@ -150,10 +155,12 @@ def train(model,
         val_metrics_str = ", ".join(val_metric_items_str)
         # print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
-        if is_scheduler_per_batch(scheduler):
-            scheduler.step()
-
         current_val_loss = history["val_loss"][-1]
+        # current_val_loss = history["train_loss"][-1]
+        
+        if is_scheduler_requires_val(scheduler):
+            scheduler.step(current_val_loss)
+        
         if save_model and is_best_model(current_val_loss, best_loss, mode="min"):
             if best_epoch > 0 and os.path.exists(os.path.join(save_path, f"epoch_{best_epoch+1}.pth")):
                  try:
@@ -171,7 +178,7 @@ def train(model,
             print(f"Early stopping triggered after {early_stopping} epochs with no improvement since epoch {best_epoch + 1}.")
             break
         loop.set_postfix(train_loss=history["train_loss"][-1], val_loss=history["val_loss"][-1], train_metrics=train_metrics_str, val_metrics=val_metrics_str)
-        clear_memory()
+        # clear_memory()
     
     if save_metrics:
         final_history_to_save = {

@@ -162,6 +162,14 @@ def is_scheduler_per_batch(scheduler):
     else:
         return False
 
+def is_scheduler_requires_val(scheduler):
+    if scheduler is None:
+        return False
+    if (isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau)):
+        return True
+    else:
+        return False
+
 def load_model(model_path, num_classes=None, dropout_rate=0.25):
     """
     Load a DenseNet121 model from a saved state dict or create a new one
