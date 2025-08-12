@@ -15,8 +15,13 @@ class DenseNet121(nn.Module):
         super(DenseNet121, self).__init__()
         
         self.densenet_model = models.densenet121(weights='IMAGENET1K_V1')
+        self.pool = True
         self.dropout = nn.Dropout(p=dropout_rate)
-        self.classifier = nn.Linear(82944, num_classes)
+        
+        if self.pool:
+            self.classifier = nn.Linear(1024, num_classes)
+        else:
+            self.classifier = nn.Linear(82944, num_classes)
         
     def forward(self, x):
         """
@@ -36,6 +41,9 @@ class DenseNet121(nn.Module):
         features = self.densenet_model.features(x)
         out = F.relu(features, inplace=True)
         
+        if self.pool:
+            out = F.adaptive_avg_pool2d(out, (1, 1))  # Global avg pool
+        
         if self.training:
             # Apply dropout only during training
             out = self.dropout(out)
@@ -45,5 +53,5 @@ class DenseNet121(nn.Module):
 
         # Pass through the classifier
         out = self.classifier(out) 
-        
+                
         return out
