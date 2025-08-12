@@ -103,7 +103,10 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
         
         if samples_processed >= num_samples:
             break
+        
 
+        
+        
             
         data = data.to(device)
         targets = targets.to(device)
@@ -124,6 +127,8 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             img = data[i].cpu().numpy()
             pred_idx = predicted_indices[i].item()
             true_idx = target_indices[i].item()
+            
+            test_data_instance = test_loader.dataset.dataframe.iloc[samples_processed]
 
             print(f'Processing sample {samples_processed + 1}, raw prediction: {model_outputs_raw[i].cpu().numpy()}, predicted index: {pred_idx}, true index: {true_idx}')
 
@@ -308,12 +313,17 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             if save_path:
                 true_label = categories[true_idx]
                 pred_label = categories[pred_idx]
+                
+                if pred_label != test_data_instance['predicted_class']:
+                    print(test_data_instance)
+                    print(f"Warning: Predicted label {pred_label} does not match test data instance label {test_data_instance['predicted_class']}")
+                                    
                 os.makedirs(save_path, exist_ok=True)
                 
                 if pred_label == true_label:
-                    plt.savefig(os.path.join(save_path, f'{true_label}_{samples_processed}.png'))
+                    plt.savefig(os.path.join(save_path, f'correct_{true_label}_{samples_processed}.png'))
                 else:
-                    plt.savefig(os.path.join(save_path, f'wrong_{true_label}_{samples_processed}.png'))
+                    plt.savefig(os.path.join(save_path, f'wrong_true{true_label}_pred{pred_label}_{samples_processed}.png'))
 
             if print_img:
                 plt.show()
@@ -321,8 +331,8 @@ def plot_XDL_Visualizations(model, test_loader, device, num_samples=5, print_img
             plt.close(fig)
             samples_processed += 1
             
-        if batch_idx % print_every == 0:
-            print(f'Processed {samples_processed} samples')
+        # if batch_idx % print_every == 0:
+        #     print(f'Processed {samples_processed} samples')
 
 # Keep the original plot_XDL_GradCAM function for backward compatibility
 def plot_XDL_GradCAM(model, test_loader, device, fontsize=13, num_samples=5, print_img=False, print_every=10, save_path=None):
