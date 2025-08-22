@@ -16,7 +16,12 @@ class ResNet50(nn.Module):
 
         self.resnet_model = models.resnet50(weights='IMAGENET1K_V2')
         self.dropout = nn.Dropout(p=dropout_rate)
-        self.classifier = nn.Linear(204800, num_classes)
+        self.pool = True
+        
+        if self.pool:
+            self.classifier = nn.Linear(2048, num_classes)
+        else:
+            self.classifier = nn.Linear(204800, num_classes)
 
     def forward(self, x):
         """
@@ -44,13 +49,17 @@ class ResNet50(nn.Module):
         features = self.resnet_model.layer4(x)
         
         # out = F.relu(features, inplace=True)
+        out = features
         
-        # Add dropout layer
+        if self.pool:
+            out = F.adaptive_avg_pool2d(out, (1, 1))  # Global avg pool
+        
         if self.training:
-            features = self.dropout(features)
+            # Apply dropout only during training
+            out = self.dropout(out)
 
         # Flatten the output
-        out = torch.flatten(features, 1)
+        out = torch.flatten(out, 1)
 
         # Pass through the classifier
         out = self.classifier(out) 

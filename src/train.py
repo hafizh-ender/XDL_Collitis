@@ -34,7 +34,8 @@ def train(model,
         for metric_obj in metrics.values():
             metric_obj.to(device)
     
-    best_loss = float('inf')
+    # best_loss = float('inf')
+    best_loss = 0
     best_epoch = 0
     history = {
         "train_loss": [],
@@ -108,7 +109,7 @@ def train(model,
             #     print(f"Epoch {epoch+1}/{num_epochs}, Batch {batch_idx + 1}/{len(train_loader)}, Train Loss: {running_loss / (batch_idx + 1):.4f}")
         
         
-        if not is_scheduler_per_batch(scheduler) and not is_scheduler_requires_val(scheduler):
+        if (not is_scheduler_per_batch(scheduler)) and (not is_scheduler_requires_val(scheduler)) and (scheduler is not None):
             scheduler.step()
         
         history["train_loss"].append(running_loss / len(train_loader))
@@ -155,13 +156,14 @@ def train(model,
         val_metrics_str = ", ".join(val_metric_items_str)
         # print(f"Epoch {epoch+1} Val - Loss: {val_loss_epoch:.4f}, Metrics: {{{val_metrics_str}}}")
 
-        current_val_loss = history["val_loss"][-1]
+        # current_val_loss = history["val_loss"][-1]
+        current_val_loss = history["val_metrics"]['f1_score'][-1]
         # current_val_loss = history["train_loss"][-1]
         
         if is_scheduler_requires_val(scheduler):
             scheduler.step(current_val_loss)
         
-        if save_model and is_best_model(current_val_loss, best_loss, mode="min"):
+        if save_model and is_best_model(current_val_loss, best_loss, mode="max"):
             if best_epoch > 0 and os.path.exists(os.path.join(save_path, f"epoch_{best_epoch+1}.pth")):
                  try:
                     os.remove(os.path.join(save_path, f"epoch_{best_epoch+1}.pth"))
@@ -177,7 +179,7 @@ def train(model,
         elif epoch > best_epoch and epoch + 1 - best_epoch >= early_stopping:
             print(f"Early stopping triggered after {early_stopping} epochs with no improvement since epoch {best_epoch + 1}.")
             break
-        loop.set_postfix(train_loss=history["train_loss"][-1], val_loss=history["val_loss"][-1], train_metrics=train_metrics_str, val_metrics=val_metrics_str)
+        loop.set_postfix(train_loss=history["train_loss"][-1], val_loss=history["val_loss"][-1], train_metrics=train_metrics_str, val_metrics=val_metrics_str, learning_rate=optimizer.param_groups[0]['lr'])
         # clear_memory()
     
     if save_metrics:
