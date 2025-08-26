@@ -85,8 +85,8 @@ def plot_XDL_Visualizations(model: DenseNet121Multilayer, test_loader, device, n
         targets = targets.to(device)
         
         with torch.no_grad():
-            first_layer_raw, model_outputs_raw = model(data)
-            first_predicted_indices = torch.argmax(first_layer_raw, dim=1)
+            model_outputs_raw = model(data)
+            first_predicted_indices = torch.argmax(model.out_1, dim=1)
 
             predicted_indices = torch.argmax(model_outputs_raw, dim=1)
             target_indices = torch.argmax(targets, dim=1)

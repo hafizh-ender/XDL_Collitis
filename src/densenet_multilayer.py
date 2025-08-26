@@ -33,8 +33,8 @@ class DenseNet121Multilayer(nn.Module):
             x = x.unsqueeze(0)
             
         # First layer classification
-        out_1 = self.model_layer_1(x)
-        pred_idx = torch.argmax(out_1, dim=1).item()
+        self.out_1 = self.model_layer_1(x)
+        pred_idx = torch.argmax(self.out_1, dim=1).item()
 
         if pred_idx == 0:
             out_2_1 = self.model_layer_2[pred_idx](x) 
@@ -45,4 +45,4 @@ class DenseNet121Multilayer(nn.Module):
 
         # Concatenate and return 1D tensor (for B == 1)
         out_2 = torch.cat([out_2_1, out_2_2], dim=-1).view(-1)
-        return out_1, out_2
+        return out_2
