@@ -29,13 +29,20 @@ class DenseNet121Multilayer(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (batch_size, num_classes)
         """
-        # Add batch dimension if input is a single image
         if x.dim() == 3:
             x = x.unsqueeze(0)
             
         # First layer classification
-        with torch.no_grad():
-            predicted_group_indices = torch.argmax(self.model_layer_1(x), dim=1)
-            out = self.model_layer_2[predicted_group_indices](x)
-        
-        return out
+        out_1 = self.model_layer_1(x)
+        pred_idx = torch.argmax(out_1, dim=1).item()
+
+        if pred_idx == 0:
+            out_2_1 = self.model_layer_2[pred_idx](x) 
+            out_2_2 = torch.zeros_like(out_2_1, device=out_2_1.device, dtype=out_2_1.dtype)
+        elif pred_idx == 1:
+            out_2_2 = self.model_layer_2[pred_idx](x) 
+            out_2_1 = torch.zeros_like(out_2_2, device=out_2_2.device, dtype=out_2_2.dtype)
+
+        # Concatenate and return 1D tensor (for B == 1)
+        out_2 = torch.cat([out_2_1, out_2_2], dim=-1).view(-1)
+        return out_1, out_2
