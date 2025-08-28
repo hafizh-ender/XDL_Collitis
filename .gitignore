@@ -6,6 +6,7 @@ __pycache__/
 
 # datasets
 datasets/
+dataset/
 outputs/
 artifacts/
 # C extensions
